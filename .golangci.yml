@@ -1,0 +1,151 @@
+version: "2"
+
+run:
+  go: "1.24"
+
+linters:
+  enable:
+    - staticcheck
+    - errcheck
+    - gosec
+    - govet
+    - unused
+    - ineffassign
+    - revive
+    - gocritic
+    - bodyclose
+    - nilerr
+    - unconvert
+    - usestdlibvars
+    - errorlint
+    - exhaustive
+    - prealloc
+    - noctx
+    - nilnil
+    - errname
+    - wrapcheck
+    - makezero
+    - sloglint
+    - gosmopolitan
+    - tagliatelle
+    - testableexamples
+    - testifylint
+    - decorder
+    - goheader
+    - grouper
+    - copyloopvar
+    - intrange
+    - nakedret
+    - perfsprint
+  settings:
+    govet:
+      enable:
+        - shadow
+        - fieldalignment
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: true
+    exhaustive:
+      default-signifies-exhaustive: true
+    revive:
+      severity: warning
+      rules:
+        - name: atomic
+        - name: bool-literal-in-expr
+        - name: comment-spacings
+        - name: confusing-naming
+        - name: confusing-results
+        - name: constant-logical-expr
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: datarace
+        - name: defer
+        - name: dot-imports
+        - name: duplicated-imports
+        - name: early-return
+        - name: empty-block
+        - name: empty-lines
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: function-result-limit
+          arguments: [3]
+        - name: get-return
+        - name: identical-branches
+        - name: if-return
+        - name: import-alias-naming
+        - name: import-shadowing
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: line-length-limit
+          arguments: [120]
+        - name: modifies-parameter
+        - name: modifies-value-receiver
+        - name: nested-structs
+        - name: optimize-operands-order
+        - name: range-val-address
+        - name: range-val-in-closure
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: redundant-build-tag
+        - name: redundant-import-alias
+        - name: redundant-test-main-exit
+        - name: string-of-int
+        - name: struct-tag
+        - name: superfluous-else
+        - name: time-date
+        - name: time-equal
+        - name: time-naming
+        - name: unchecked-type-assertion
+        - name: unconditional-recursion
+        - name: unexported-naming
+        - name: unexported-return
+        - name: unhandled-error
+        - name: unnecessary-format
+        - name: unnecessary-stmt
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: unused-receiver
+        - name: use-any
+        - name: use-errors-new
+        - name: use-fmt-print
+        - name: useless-break
+        - name: var-declaration
+        - name: var-naming
+        - name: waitgroup-by-value
+    tagliatelle:
+      case:
+        rules:
+          json: camel
+    wrapcheck:
+      extra-ignore-sigs:
+        - .Err(
+    goheader:
+      template: |-
+        Copyright {{ YEAR }} The Zaparoo Project Contributors.
+        SPDX-License-Identifier: Apache-2.0
+
+        Licensed under the Apache License, Version 2.0 (the "License");
+        you may not use this file except in compliance with the License.
+        You may obtain a copy of the License at
+
+            http://www.apache.org/licenses/LICENSE-2.0
+
+        Unless required by applicable law or agreed to in writing, software
+        distributed under the License is distributed on an "AS IS" BASIS,
+        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+        See the License for the specific language governing permissions and
+        limitations under the License.
+
+formatters:
+  enable:
+    - gofumpt
+    - gci

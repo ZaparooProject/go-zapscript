@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  lint-fix:
+    desc: Run golangci-lint with auto-fixes
+    cmds:
+      - golangci-lint run --fix ./...
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -race ./...
