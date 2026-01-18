@@ -78,8 +78,7 @@ func TestParseInputMacroArgs(t *testing.T) {
 			input: `**input.keyboard:abc\`,
 			want: zapscript.Script{
 				Cmds: []zapscript.Command{
-					// backslash at end outputs \ and then EOF (0)
-					{Name: "input.keyboard", Args: []string{"a", "b", "c", "\\", "\x00"}},
+					{Name: "input.keyboard", Args: []string{"a", "b", "c", "\\"}},
 				},
 			},
 		},

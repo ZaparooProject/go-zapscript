@@ -465,6 +465,7 @@ func (sr *ScriptReader) parseInputMacroArg() (args []string, advArgs map[string]
 				return args, advArgs, readErr
 			} else if next == eof {
 				args = append(args, string(SymInputMacroEscapeSeq))
+				break
 			}
 
 			args = append(args, string(next))
@@ -786,8 +787,18 @@ func (sr *ScriptReader) parseMediaTitleSyntax() (*mediaTitleParseResult, error) 
 	result.rawContent = strings.TrimSpace(rawContent)
 
 	// Validate: must contain at least one / separator for system/title format
-	if !strings.Contains(result.rawContent, string(SymMediaTitleSep)) {
+	sepIdx := strings.Index(result.rawContent, string(SymMediaTitleSep))
+	if sepIdx == -1 {
 		// Not valid media title format, return for auto-launch fallback
+		result.valid = false
+		return result, nil
+	}
+
+	// Validate: both system ID and game name must be non-empty
+	systemID := strings.TrimSpace(result.rawContent[:sepIdx])
+	gameName := strings.TrimSpace(result.rawContent[sepIdx+1:])
+	if systemID == "" || gameName == "" {
+		// Empty system or game name, return for auto-launch fallback
 		result.valid = false
 		return result, nil
 	}

@@ -305,31 +305,31 @@ func TestParseMediaTitleSyntax(t *testing.T) {
 			},
 		},
 
-		// Edge cases
+		// Edge cases - empty system or game name falls back to auto-launch
 		{
-			name:  "empty system ID",
+			name:  "empty system ID - fallback to auto-launch",
 			input: `@/Game Name`,
 			want: zapscript.Script{
 				Cmds: []zapscript.Command{
-					{Name: "launch.title", Args: []string{"/Game Name"}},
+					{Name: "launch", Args: []string{"@/Game Name"}},
 				},
 			},
 		},
 		{
-			name:  "empty game name",
+			name:  "empty game name - fallback to auto-launch",
 			input: `@snes/`,
 			want: zapscript.Script{
 				Cmds: []zapscript.Command{
-					{Name: "launch.title", Args: []string{"snes/"}},
+					{Name: "launch", Args: []string{"@snes/"}},
 				},
 			},
 		},
 		{
-			name:  "just slash",
+			name:  "just slash - fallback to auto-launch",
 			input: `@/`,
 			want: zapscript.Script{
 				Cmds: []zapscript.Command{
-					{Name: "launch.title", Args: []string{"/"}},
+					{Name: "launch", Args: []string{"@/"}},
 				},
 			},
 		},
