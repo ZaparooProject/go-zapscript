@@ -114,6 +114,9 @@ task lint
 ```
 go-zapscript/
 ├── parser.go           # Main parsing engine with ScriptReader
+├── reader.go           # ScriptReader input handling
+├── symbols.go          # Parser symbols and character constants
+├── traits.go           # Traits syntax parsing (#key=value)
 ├── types.go            # Type definitions, constants, and argument structures
 ├── models.go           # JSON-serializable data structures for scripts
 ├── advargs.go          # Type-safe advanced argument wrapper
@@ -121,6 +124,7 @@ go-zapscript/
 ├── parser_test.go      # Core parsing tests
 ├── parser_coverage_test.go    # Extended coverage tests
 ├── parser_media_title_test.go # Media title syntax tests
+├── parser_traits_test.go      # Traits syntax tests
 ├── parser_property_test.go    # Property-based tests (rapid)
 ├── parser_fuzz_test.go        # Fuzz tests
 ├── parser_internal_test.go    # Internal implementation tests
@@ -175,6 +179,37 @@ Direct media launch by system and title.
 - `-tag` - NOT (must not have tag)
 - `~tag` - OR (any of these tags)
 
+### Traits Syntax
+
+Traits provide metadata key-value pairs using `#` prefix:
+
+```
+#key=value #key2=value2
+```
+
+- `#key=value` - Key-value pair
+- `#flag` - Boolean shorthand (sets value to `true`)
+- `#key="quoted value"` - Quoted string (preserves spaces)
+- `#key=[a,b,c]` - Array values
+
+**Type Inference** (unquoted values):
+- `true`/`false` → boolean
+- `123` → integer
+- `3.14` → float
+- Everything else → string
+- Quoted values are always strings
+
+**Examples**:
+```
+#favorite                     → {"favorite": true}
+#count=5                      → {"count": 5}
+#name="My Game"               → {"name": "My Game"}
+#tags=[action,rpg,indie]      → {"tags": ["action", "rpg", "indie"]}
+#enabled=true #priority=1     → {"enabled": true, "priority": 1}
+```
+
+**Fallback Behavior**: Invalid trait syntax (e.g., `#my-trait` with hyphen) falls back to auto-launch content.
+
 ## Key API Entry Points
 
 ```go
@@ -202,14 +237,17 @@ result, err := parser.EvalExpressions(envStruct)
 - **HTTP**: `http.get`, `http.post`
 - **Input**: `input.keyboard`, `input.gamepad`, `input.coinp1`, `input.coinp2`
 - **UI**: `ui.notice`, `ui.picker`
+- **Metadata**: `traits` (parsed from `#key=value` syntax)
 
 ## Good Examples to Follow
 
 **Copy these patterns for new code:**
 
 - **Parser Methods**: `parser.go` - ScriptReader parsing methods
+- **Traits Parsing**: `traits.go` - Type inference, arrays, quoted values
 - **Type Definitions**: `types.go` - Constant and type patterns
 - **Table-Driven Tests**: `parser_test.go` - Test organization pattern
+- **Traits Tests**: `parser_traits_test.go` - Comprehensive trait syntax tests
 - **Property Tests**: `parser_property_test.go` - Property-based testing with rapid
 - **Fuzz Tests**: `parser_fuzz_test.go` - Fuzz testing pattern
 
