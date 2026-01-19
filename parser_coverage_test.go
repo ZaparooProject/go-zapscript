@@ -639,6 +639,65 @@ func TestParseAdvArgs(t *testing.T) {
 }
 
 // ============================================================================
+// Regression tests
+// ============================================================================
+
+func TestParseAdvArgsEscapeFallbackRegression(t *testing.T) {
+	t.Parallel()
+
+	// Regression test: when parseAdvArgs falls back due to invalid arg name,
+	// the raw buffer should include characters consumed by escape sequences.
+	// Bug: escape sequence like ^n would lose the 'n' in the fallback buffer.
+	tests := []struct {
+		name  string
+		input string
+		want  zapscript.Script
+	}{
+		{
+			name:  "escape in adv arg value before invalid key preserves escaped char",
+			input: `@system/title?key=val^n&-bad`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "launch.title", Args: []string{"system/title?key=val^n&-bad"}},
+				},
+			},
+		},
+		{
+			name:  "multiple escapes before invalid key",
+			input: `@sys/game?msg=a^tb^nc&-x`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "launch.title", Args: []string{"sys/game?msg=a^tb^nc&-x"}},
+				},
+			},
+		},
+		{
+			name:  "escape caret before invalid key",
+			input: `@sys/game?val=a^^b&-x`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "launch.title", Args: []string{"sys/game?val=a^^b&-x"}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := zapscript.NewParser(tt.input)
+			got, err := p.ParseScript()
+			if err != nil {
+				t.Fatalf("ParseScript() unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tt.want, got, cmp.AllowUnexported(zapscript.AdvArgs{})); diff != "" {
+				t.Errorf("ParseScript() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// ============================================================================
 // Additional edge case tests
 // ============================================================================
 

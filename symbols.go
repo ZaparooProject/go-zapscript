@@ -28,6 +28,8 @@ var (
 	ErrUnmatchedInputMacroExt = errors.New("unmatched input macro extension")
 	ErrUnmatchedExpression    = errors.New("unmatched expression")
 	ErrBadExpressionReturn    = errors.New("expression return type not supported")
+	ErrInvalidTraitKey        = errors.New("invalid trait key")
+	ErrUnmatchedArrayBracket  = errors.New("unmatched array bracket")
 )
 
 const (
@@ -55,6 +57,10 @@ const (
 	SymTagAnd              = '+'
 	SymTagNot              = '-'
 	SymTagOr               = '~'
+	SymTraitsStart         = '#'
+	SymArrayStart          = '['
+	SymArrayEnd            = ']'
+	SymArraySep            = ','
 	TokExpStart            = "\uE000"
 	TokExprEnd             = "\uE001"
 )
@@ -67,6 +73,10 @@ func isCmdName(ch rune) bool {
 
 func isAdvArgName(ch rune) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'
+}
+
+func isAdvArgNameStart(ch rune) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
 }
 
 func isWhitespace(ch rune) bool {

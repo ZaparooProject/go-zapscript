@@ -200,7 +200,12 @@ func (sr *ScriptReader) parseAdvArgs() (advArgs map[string]string, remainingStr 
 				currentValue = jsonValue
 				continue
 			case ch == SymEscapeSeq:
-				// escaping next character
+				// Peek next char for raw tracking before parseEscapeSeq consumes it
+				nextRaw, peekErr := sr.peek()
+				if peekErr != nil {
+					return advArgs, string(buf), peekErr
+				}
+
 				next, escapeErr := sr.parseEscapeSeq()
 				if escapeErr != nil {
 					return advArgs, string(buf), escapeErr
@@ -208,6 +213,7 @@ func (sr *ScriptReader) parseAdvArgs() (advArgs map[string]string, remainingStr 
 					currentValue += string(SymEscapeSeq)
 					continue
 				}
+				buf = append(buf, nextRaw)
 				currentValue += next
 				continue
 			}

@@ -55,6 +55,8 @@ const (
 	ZapScriptCmdUINotice = "ui.notice"
 	ZapScriptCmdUIPicker = "ui.picker"
 
+	ZapScriptCmdTraits = "traits"
+
 	ZapScriptCmdInputKey = "input.key" // DEPRECATED
 	ZapScriptCmdKey      = "key"       // DEPRECATED
 	ZapScriptCmdCoinP1   = "coinp1"    // DEPRECATED

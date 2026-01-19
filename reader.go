@@ -95,7 +95,8 @@ type Command struct {
 }
 
 type Script struct {
-	Cmds []Command
+	Traits map[string]any `json:"traits,omitempty"`
+	Cmds   []Command      `json:"cmds"`
 }
 
 type PostArgPartType int

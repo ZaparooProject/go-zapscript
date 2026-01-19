@@ -16,6 +16,7 @@
 package zapscript
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -186,6 +187,8 @@ commandLoop:
 
 func (sr *ScriptReader) ParseScript() (Script, error) {
 	script := Script{}
+	hasNonTraitContent := false
+	var pendingFallback *traitsParseResult
 
 	parseErr := func(err error) error {
 		return fmt.Errorf("parse error at %d: %w", sr.pos, err)
@@ -204,6 +207,7 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 			cmd.AdvArgs = NewAdvArgs(advArgs)
 		}
 		script.Cmds = append(script.Cmds, cmd)
+		hasNonTraitContent = true
 		return nil
 	}
 
@@ -249,6 +253,34 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 			}
 
 			script.Cmds = append(script.Cmds, cmd)
+			hasNonTraitContent = true
+			continue
+		case ch == SymTraitsStart:
+			// Traits shorthand syntax: #key=value #key2=value2
+			result, err := sr.parseTraitsSyntax()
+			if err != nil {
+				return script, parseErr(err)
+			}
+
+			// If fallback is set due to invalid key, defer handling
+			if result.fallback != "" {
+				if result.invalidKey {
+					pendingFallback = result
+				} else {
+					if autoErr := parseAutoLaunchCmd(result.fallback); autoErr != nil {
+						return script, parseErr(autoErr)
+					}
+				}
+				continue
+			}
+
+			// Merge traits (later overwrites earlier)
+			if script.Traits == nil {
+				script.Traits = make(map[string]any)
+			}
+			for k, v := range result.traits {
+				script.Traits[k] = v
+			}
 			continue
 		case ch == SymCmdStart:
 			next, err := sr.peek()
@@ -282,7 +314,21 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 			case err != nil:
 				return script, parseErr(err)
 			default:
+				// Handle **traits command by merging into script.Traits
+				if cmd.Name == ZapScriptCmdTraits && len(cmd.Args) > 0 {
+					var traitsData map[string]any
+					if jsonErr := json.Unmarshal([]byte(cmd.Args[0]), &traitsData); jsonErr == nil {
+						if script.Traits == nil {
+							script.Traits = make(map[string]any)
+						}
+						for k, v := range traitsData {
+							script.Traits[k] = v
+						}
+						continue
+					}
+				}
 				script.Cmds = append(script.Cmds, cmd)
+				hasNonTraitContent = true
 			}
 
 			continue
@@ -301,7 +347,15 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 		}
 	}
 
-	if len(script.Cmds) == 0 {
+	// Handle pending fallback from invalid trait key
+	if pendingFallback != nil {
+		if !hasNonTraitContent {
+			return script, ErrInvalidTraitKey
+		}
+		// Silent fallback when mixed with other content (documented behavior)
+	}
+
+	if len(script.Cmds) == 0 && len(script.Traits) == 0 {
 		return script, ErrEmptyZapScript
 	}
 
