@@ -35,7 +35,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 		traits: make(map[string]any),
 	}
 	var fallbackBuf strings.Builder
-	fallbackBuf.WriteRune(SymTraitsStart)
+	_, _ = fallbackBuf.WriteRune(SymTraitsStart)
 
 	for {
 		ch, readErr := sr.read()
@@ -47,7 +47,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 			break
 		}
 
-		fallbackBuf.WriteRune(ch)
+		_, _ = fallbackBuf.WriteRune(ch)
 
 		// First char of key must be a letter
 		if !isAdvArgNameStart(ch) {
@@ -56,7 +56,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 			if consumeErr != nil {
 				return nil, consumeErr
 			}
-			fallbackBuf.WriteString(rest)
+			_, _ = fallbackBuf.WriteString(rest)
 			result.fallback = fallbackBuf.String()
 			result.invalidKey = true
 			result.invalidKeyName = fallbackBuf.String()
@@ -78,8 +78,8 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 			if readErr != nil {
 				return nil, readErr
 			}
-			fallbackBuf.WriteRune(ch)
-			keySb.WriteString(strings.ToLower(string(ch)))
+			_, _ = fallbackBuf.WriteRune(ch)
+			_, _ = keySb.WriteString(strings.ToLower(string(ch)))
 		}
 		key += keySb.String()
 
@@ -98,14 +98,14 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 			if readErr != nil {
 				return nil, readErr
 			}
-			fallbackBuf.WriteRune(ch)
+			_, _ = fallbackBuf.WriteRune(ch)
 
 			// Parse the value
 			parsedValue, valueStr, parseErr := sr.parseTraitValue()
 			if parseErr != nil {
 				return nil, parseErr
 			}
-			fallbackBuf.WriteString(valueStr)
+			_, _ = fallbackBuf.WriteString(valueStr)
 			value = parsedValue
 		case next == eof || next == SymCmdSep || next == SymTraitsStart || isWhitespace(next):
 			// Valid end of boolean shorthand trait
@@ -115,7 +115,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 			if consumeErr != nil {
 				return nil, consumeErr
 			}
-			fallbackBuf.WriteString(rest)
+			_, _ = fallbackBuf.WriteString(rest)
 			result.fallback = fallbackBuf.String()
 			result.invalidKey = true
 			result.invalidKeyName = key
@@ -149,7 +149,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 					return result, nil
 				}
 				// Single | is not end of command, continue
-				fallbackBuf.WriteRune(ch)
+				_, _ = fallbackBuf.WriteRune(ch)
 				continue
 			}
 
@@ -158,7 +158,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 				if readErr != nil {
 					return nil, readErr
 				}
-				fallbackBuf.WriteRune(ch)
+				_, _ = fallbackBuf.WriteRune(ch)
 				continue
 			}
 
@@ -168,7 +168,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 				if readErr != nil {
 					return nil, readErr
 				}
-				fallbackBuf.WriteRune(ch)
+				_, _ = fallbackBuf.WriteRune(ch)
 				break
 			}
 
@@ -200,7 +200,7 @@ func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err e
 		if readErr != nil {
 			return "", "", readErr
 		}
-		rawBuf.WriteRune(ch)
+		_, _ = rawBuf.WriteRune(ch)
 		quoted = true
 		quoteChar = ch
 
@@ -213,7 +213,7 @@ func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err e
 			if ch == eof {
 				return "", rawBuf.String(), ErrUnmatchedQuote
 			}
-			rawBuf.WriteRune(ch)
+			_, _ = rawBuf.WriteRune(ch)
 
 			if ch == SymEscapeSeq {
 				// Peek next char for raw tracking before parseEscapeSeq consumes it
@@ -228,11 +228,11 @@ func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err e
 				}
 				if escaped == "" {
 					// EOF after escape
-					valueBuf.WriteRune(SymEscapeSeq)
+					_, _ = valueBuf.WriteRune(SymEscapeSeq)
 					continue
 				}
-				rawBuf.WriteRune(nextRaw)
-				valueBuf.WriteString(escaped)
+				_, _ = rawBuf.WriteRune(nextRaw)
+				_, _ = valueBuf.WriteString(escaped)
 				continue
 			}
 
@@ -241,7 +241,7 @@ func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err e
 				return valueBuf.String(), rawBuf.String(), nil
 			}
 
-			valueBuf.WriteRune(ch)
+			_, _ = valueBuf.WriteRune(ch)
 		}
 	}
 
@@ -265,7 +265,7 @@ func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err e
 		if readErr != nil {
 			return "", rawBuf.String(), readErr
 		}
-		rawBuf.WriteRune(ch)
+		_, _ = rawBuf.WriteRune(ch)
 
 		// Handle escape sequences
 		if ch == SymEscapeSeq {
@@ -280,15 +280,15 @@ func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err e
 				return "", rawBuf.String(), escapeErr
 			}
 			if escaped == "" {
-				valueBuf.WriteRune(SymEscapeSeq)
+				_, _ = valueBuf.WriteRune(SymEscapeSeq)
 				continue
 			}
-			rawBuf.WriteRune(nextRaw)
-			valueBuf.WriteString(escaped)
+			_, _ = rawBuf.WriteRune(nextRaw)
+			_, _ = valueBuf.WriteString(escaped)
 			continue
 		}
 
-		valueBuf.WriteRune(ch)
+		_, _ = valueBuf.WriteRune(ch)
 	}
 
 	return inferType(valueBuf.String(), quoted), rawBuf.String(), nil
@@ -314,7 +314,7 @@ func (sr *ScriptReader) consumeToEndOfCmd() (string, error) {
 			break
 		}
 
-		buf.WriteRune(ch)
+		_, _ = buf.WriteRune(ch)
 	}
 	return buf.String(), nil
 }
@@ -330,7 +330,7 @@ func (sr *ScriptReader) parseTraitArray() (parsedValue any, rawStr string, err e
 	if readErr != nil {
 		return nil, "", readErr
 	}
-	rawBuf.WriteRune(ch)
+	_, _ = rawBuf.WriteRune(ch)
 
 	// Parse array elements
 	for {
@@ -347,7 +347,7 @@ func (sr *ScriptReader) parseTraitArray() (parsedValue any, rawStr string, err e
 			if readErr != nil {
 				return nil, rawBuf.String(), readErr
 			}
-			rawBuf.WriteRune(ch)
+			_, _ = rawBuf.WriteRune(ch)
 		}
 
 		// Check for end of array or empty array
@@ -363,7 +363,7 @@ func (sr *ScriptReader) parseTraitArray() (parsedValue any, rawStr string, err e
 			if readErr != nil {
 				return nil, rawBuf.String(), readErr
 			}
-			rawBuf.WriteRune(ch)
+			_, _ = rawBuf.WriteRune(ch)
 			return elements, rawBuf.String(), nil
 		}
 
@@ -372,7 +372,7 @@ func (sr *ScriptReader) parseTraitArray() (parsedValue any, rawStr string, err e
 		if parseErr != nil {
 			return nil, rawBuf.String() + elemRaw, parseErr
 		}
-		rawBuf.WriteString(elemRaw)
+		_, _ = rawBuf.WriteString(elemRaw)
 		elements = append(elements, elemValue)
 
 		// Skip whitespace after element
@@ -388,7 +388,7 @@ func (sr *ScriptReader) parseTraitArray() (parsedValue any, rawStr string, err e
 			if readErr != nil {
 				return nil, rawBuf.String(), readErr
 			}
-			rawBuf.WriteRune(ch)
+			_, _ = rawBuf.WriteRune(ch)
 		}
 
 		// Check for separator or end
@@ -405,7 +405,7 @@ func (sr *ScriptReader) parseTraitArray() (parsedValue any, rawStr string, err e
 			if readErr != nil {
 				return nil, rawBuf.String(), readErr
 			}
-			rawBuf.WriteRune(ch)
+			_, _ = rawBuf.WriteRune(ch)
 			return elements, rawBuf.String(), nil
 		}
 		if next == SymArraySep {
@@ -413,7 +413,7 @@ func (sr *ScriptReader) parseTraitArray() (parsedValue any, rawStr string, err e
 			if readErr != nil {
 				return nil, rawBuf.String(), readErr
 			}
-			rawBuf.WriteRune(ch)
+			_, _ = rawBuf.WriteRune(ch)
 			continue
 		}
 
@@ -438,7 +438,7 @@ func (sr *ScriptReader) parseArrayElement() (parsedValue any, rawStr string, err
 		if readErr != nil {
 			return "", "", readErr
 		}
-		rawBuf.WriteRune(ch)
+		_, _ = rawBuf.WriteRune(ch)
 		quoteChar := ch
 
 		// Parse quoted value
@@ -450,7 +450,7 @@ func (sr *ScriptReader) parseArrayElement() (parsedValue any, rawStr string, err
 			if ch == eof {
 				return "", rawBuf.String(), ErrUnmatchedQuote
 			}
-			rawBuf.WriteRune(ch)
+			_, _ = rawBuf.WriteRune(ch)
 
 			if ch == SymEscapeSeq {
 				nextRaw, peekErr := sr.peek()
@@ -463,11 +463,11 @@ func (sr *ScriptReader) parseArrayElement() (parsedValue any, rawStr string, err
 					return "", rawBuf.String(), escapeErr
 				}
 				if escaped == "" {
-					valueBuf.WriteRune(SymEscapeSeq)
+					_, _ = valueBuf.WriteRune(SymEscapeSeq)
 					continue
 				}
-				rawBuf.WriteRune(nextRaw)
-				valueBuf.WriteString(escaped)
+				_, _ = rawBuf.WriteRune(nextRaw)
+				_, _ = valueBuf.WriteString(escaped)
 				continue
 			}
 
@@ -475,7 +475,7 @@ func (sr *ScriptReader) parseArrayElement() (parsedValue any, rawStr string, err
 				return valueBuf.String(), rawBuf.String(), nil
 			}
 
-			valueBuf.WriteRune(ch)
+			_, _ = valueBuf.WriteRune(ch)
 		}
 	}
 
@@ -494,7 +494,7 @@ func (sr *ScriptReader) parseArrayElement() (parsedValue any, rawStr string, err
 		if readErr != nil {
 			return "", rawBuf.String(), readErr
 		}
-		rawBuf.WriteRune(ch)
+		_, _ = rawBuf.WriteRune(ch)
 
 		if ch == SymEscapeSeq {
 			nextRaw, peekErr := sr.peek()
@@ -507,15 +507,15 @@ func (sr *ScriptReader) parseArrayElement() (parsedValue any, rawStr string, err
 				return "", rawBuf.String(), escapeErr
 			}
 			if escaped == "" {
-				valueBuf.WriteRune(SymEscapeSeq)
+				_, _ = valueBuf.WriteRune(SymEscapeSeq)
 				continue
 			}
-			rawBuf.WriteRune(nextRaw)
-			valueBuf.WriteString(escaped)
+			_, _ = rawBuf.WriteRune(nextRaw)
+			_, _ = valueBuf.WriteString(escaped)
 			continue
 		}
 
-		valueBuf.WriteRune(ch)
+		_, _ = valueBuf.WriteRune(ch)
 	}
 
 	return inferType(strings.TrimSpace(valueBuf.String()), false), rawBuf.String(), nil

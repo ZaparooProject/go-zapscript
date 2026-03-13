@@ -38,6 +38,7 @@ const (
 	ZapScriptCmdEvaluate = "evaluate"
 	ZapScriptCmdStop     = "stop"
 	ZapScriptCmdEcho     = "echo"
+	ZapScriptCmdControl  = "control"
 
 	ZapScriptCmdMisterINI    = "mister.ini"
 	ZapScriptCmdMisterCore   = "mister.core"
