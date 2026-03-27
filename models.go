@@ -41,10 +41,11 @@ const (
 	ZapScriptCmdControl    = "control"
 	ZapScriptCmdScreenshot = "screenshot"
 
-	ZapScriptCmdMisterINI    = "mister.ini"
-	ZapScriptCmdMisterCore   = "mister.core"
-	ZapScriptCmdMisterScript = "mister.script"
-	ZapScriptCmdMisterMGL    = "mister.mgl"
+	ZapScriptCmdMisterINI       = "mister.ini"
+	ZapScriptCmdMisterCore      = "mister.core"
+	ZapScriptCmdMisterScript    = "mister.script"
+	ZapScriptCmdMisterMGL       = "mister.mgl"
+	ZapScriptCmdMisterWallpaper = "mister.wallpaper"
 
 	ZapScriptCmdHTTPGet  = "http.get"
 	ZapScriptCmdHTTPPost = "http.post"
