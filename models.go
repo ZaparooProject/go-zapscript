@@ -23,6 +23,7 @@ const (
 	ZapScriptCmdLaunchRandom = "launch.random"
 	ZapScriptCmdLaunchSearch = "launch.search"
 	ZapScriptCmdLaunchTitle  = "launch.title"
+	ZapScriptCmdLaunchLast   = "launch.last"
 
 	ZapScriptCmdPlaylistPlay     = "playlist.play"
 	ZapScriptCmdPlaylistStop     = "playlist.stop"
