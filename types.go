@@ -117,6 +117,15 @@ type LaunchTitleArgs struct {
 	Tags []TagFilter `advarg:"tags"`
 }
 
+// LaunchLastArgs contains advanced arguments for the launch.last command.
+type LaunchLastArgs struct {
+	GlobalArgs
+	// Launcher overrides the default launcher by ID.
+	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
+	// Action specifies the launch action (run, details).
+	Action string `advarg:"action" validate:"omitempty,oneof=run details"`
+}
+
 // PlaylistArgs contains advanced arguments for playlist commands.
 type PlaylistArgs struct {
 	GlobalArgs
