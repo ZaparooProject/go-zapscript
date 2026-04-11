@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -92,6 +94,109 @@ type Command struct {
 	AdvArgs AdvArgs
 	Name    string
 	Args    []string
+}
+
+// argNeedsQuoting returns true if the arg contains characters that require
+// double-quoting to be safely represented in ZapScript.
+func argNeedsQuoting(s string) bool {
+	for _, ch := range s {
+		switch ch {
+		case SymArgSep, SymArgStart, SymAdvArgStart, SymAdvArgSep,
+			SymAdvArgEq, SymArgDoubleQuote, SymCmdSep, SymEscapeSeq,
+			'\n', '\r', '\t':
+			return true
+		}
+	}
+	return false
+}
+
+// escapeArg re-escapes control characters using ZapScript escape sequences
+// and wraps the arg in double quotes.
+func escapeArg(s string) string {
+	var b strings.Builder
+	_, _ = b.WriteRune('"')
+	for _, ch := range s {
+		switch ch {
+		case '"':
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('"')
+		case '\n':
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('n')
+		case '\r':
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('r')
+		case '\t':
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('t')
+		case SymEscapeSeq:
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune(SymEscapeSeq)
+		default:
+			_, _ = b.WriteRune(ch)
+		}
+	}
+	_, _ = b.WriteRune('"')
+	return b.String()
+}
+
+// String returns the canonical ZapScript representation of the command.
+// The output is valid ZapScript that can be re-parsed to produce an
+// equivalent Command.
+func (c Command) String() string {
+	var b strings.Builder
+	_, _ = b.WriteString("**")
+	_, _ = b.WriteString(c.Name)
+
+	if len(c.Args) > 0 {
+		_, _ = b.WriteRune(SymArgStart)
+
+		if isInputMacroCmd(c.Name) {
+			// Input macro commands concatenate args directly
+			for _, arg := range c.Args {
+				_, _ = b.WriteString(arg)
+			}
+		} else {
+			for i, arg := range c.Args {
+				if i > 0 {
+					_, _ = b.WriteRune(SymArgSep)
+				}
+				if argNeedsQuoting(arg) {
+					_, _ = b.WriteString(escapeArg(arg))
+				} else {
+					_, _ = b.WriteString(arg)
+				}
+			}
+		}
+	}
+
+	if !c.AdvArgs.IsEmpty() {
+		_, _ = b.WriteRune(SymAdvArgStart)
+
+		// Collect and sort keys for deterministic output
+		var keys []string
+		c.AdvArgs.Range(func(key Key, _ string) bool {
+			keys = append(keys, string(key))
+			return true
+		})
+		sort.Strings(keys)
+
+		for i, key := range keys {
+			if i > 0 {
+				_, _ = b.WriteRune(SymAdvArgSep)
+			}
+			_, _ = b.WriteString(key)
+			_, _ = b.WriteRune(SymAdvArgEq)
+			value := c.AdvArgs.Get(Key(key))
+			if argNeedsQuoting(value) {
+				_, _ = b.WriteString(escapeArg(value))
+			} else {
+				_, _ = b.WriteString(value)
+			}
+		}
+	}
+
+	return b.String()
 }
 
 type Script struct {
