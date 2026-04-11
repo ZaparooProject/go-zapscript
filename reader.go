@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -92,6 +93,98 @@ type Command struct {
 	AdvArgs AdvArgs
 	Name    string
 	Args    []string
+}
+
+// argNeedsQuoting returns true if the arg contains characters that require
+// double-quoting to be safely represented in ZapScript.
+func argNeedsQuoting(s string) bool {
+	for _, ch := range s {
+		switch ch {
+		case SymArgSep, SymArgStart, SymAdvArgStart, SymAdvArgSep,
+			SymAdvArgEq, SymArgDoubleQuote, SymCmdSep, SymEscapeSeq,
+			'\n', '\r', '\t':
+			return true
+		}
+	}
+	return false
+}
+
+// escapeArg re-escapes control characters using ZapScript escape sequences
+// and wraps the arg in double quotes.
+func escapeArg(s string) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, ch := range s {
+		switch ch {
+		case '"':
+			b.WriteRune(SymEscapeSeq)
+			b.WriteByte('"')
+		case '\n':
+			b.WriteRune(SymEscapeSeq)
+			b.WriteByte('n')
+		case '\r':
+			b.WriteRune(SymEscapeSeq)
+			b.WriteByte('r')
+		case '\t':
+			b.WriteRune(SymEscapeSeq)
+			b.WriteByte('t')
+		case SymEscapeSeq:
+			b.WriteRune(SymEscapeSeq)
+			b.WriteRune(SymEscapeSeq)
+		default:
+			b.WriteRune(ch)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
+// String returns the canonical ZapScript representation of the command.
+// The output is valid ZapScript that can be re-parsed to produce an
+// equivalent Command.
+func (c Command) String() string {
+	var b strings.Builder
+	b.WriteString("**")
+	b.WriteString(c.Name)
+
+	if len(c.Args) > 0 {
+		b.WriteRune(SymArgStart)
+
+		if isInputMacroCmd(c.Name) {
+			// Input macro commands concatenate args directly
+			for _, arg := range c.Args {
+				b.WriteString(arg)
+			}
+		} else {
+			for i, arg := range c.Args {
+				if i > 0 {
+					b.WriteRune(SymArgSep)
+				}
+				if argNeedsQuoting(arg) {
+					b.WriteString(escapeArg(arg))
+				} else {
+					b.WriteString(arg)
+				}
+			}
+		}
+	}
+
+	if !c.AdvArgs.IsEmpty() {
+		b.WriteRune(SymAdvArgStart)
+		first := true
+		c.AdvArgs.Range(func(key Key, value string) bool {
+			if !first {
+				b.WriteRune(SymAdvArgSep)
+			}
+			first = false
+			b.WriteString(string(key))
+			b.WriteRune(SymAdvArgEq)
+			b.WriteString(value)
+			return true
+		})
+	}
+
+	return b.String()
 }
 
 type Script struct {
