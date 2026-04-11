@@ -111,6 +111,56 @@ func TestCommandString(t *testing.T) {
 			cmd:  zapscript.Command{Name: "input.gamepad", Args: []string{"^", "^", "V", "V", "<", ">"}},
 			want: "**input.gamepad:^^VV<>",
 		},
+		{
+			name: "arg with double quote",
+			cmd:  zapscript.Command{Name: "echo", Args: []string{`say "hi"`}},
+			want: `**echo:"say ^"hi^""`,
+		},
+		{
+			name: "arg with carriage return",
+			cmd:  zapscript.Command{Name: "echo", Args: []string{"line1\rline2"}},
+			want: `**echo:"line1^rline2"`,
+		},
+		{
+			name: "adv arg value with comma",
+			cmd: zapscript.Command{
+				Name:    "cmd",
+				AdvArgs: zapscript.NewAdvArgs(map[string]string{"list": "a,b,c"}),
+			},
+			want: `**cmd?list="a,b,c"`,
+		},
+		{
+			name: "adv arg value with colon",
+			cmd: zapscript.Command{
+				Name:    "cmd",
+				AdvArgs: zapscript.NewAdvArgs(map[string]string{"addr": "host:8080"}),
+			},
+			want: `**cmd?addr="host:8080"`,
+		},
+		{
+			name: "adv arg value with newline",
+			cmd: zapscript.Command{
+				Name:    "cmd",
+				AdvArgs: zapscript.NewAdvArgs(map[string]string{"msg": "hello\nworld"}),
+			},
+			want: `**cmd?msg="hello^nworld"`,
+		},
+		{
+			name: "adv arg value with tab",
+			cmd: zapscript.Command{
+				Name:    "cmd",
+				AdvArgs: zapscript.NewAdvArgs(map[string]string{"data": "col1\tcol2"}),
+			},
+			want: `**cmd?data="col1^tcol2"`,
+		},
+		{
+			name: "adv arg value with caret",
+			cmd: zapscript.Command{
+				Name:    "cmd",
+				AdvArgs: zapscript.NewAdvArgs(map[string]string{"expr": "2^3"}),
+			},
+			want: `**cmd?expr="2^^3"`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -127,7 +177,7 @@ func TestCommandString(t *testing.T) {
 func TestCommandString_RoundTrip(t *testing.T) {
 	t.Parallel()
 
-	// Commands that should round-trip: parse → String() → parse → same Command
+	// Ensure parse → String() → parse preserves command semantics
 	inputs := []string{
 		"**stop",
 		"**launch:/games/snes/mario.sfc",
@@ -145,20 +195,18 @@ func TestCommandString_RoundTrip(t *testing.T) {
 		t.Run(input, func(t *testing.T) {
 			t.Parallel()
 
-			// Parse the original input
 			reader1 := zapscript.NewParser(input)
 			script1, err := reader1.ParseScript()
 			if err != nil {
 				t.Fatalf("first parse failed: %v", err)
 			}
+			// Each input is a single command
 			if len(script1.Cmds) != 1 {
 				t.Fatalf("expected 1 command, got %d", len(script1.Cmds))
 			}
 
-			// Convert to string
 			str := script1.Cmds[0].String()
 
-			// Parse the string output
 			reader2 := zapscript.NewParser(str)
 			script2, err := reader2.ParseScript()
 			if err != nil {
@@ -171,7 +219,6 @@ func TestCommandString_RoundTrip(t *testing.T) {
 			cmd1 := script1.Cmds[0]
 			cmd2 := script2.Cmds[0]
 
-			// Compare Name and Args
 			if diff := cmp.Diff(cmd1.Name, cmd2.Name); diff != "" {
 				t.Errorf("round-trip Name mismatch (-original +reparsed):\n  input: %s\n  string(): %s\n%s",
 					input, str, diff)
@@ -180,8 +227,6 @@ func TestCommandString_RoundTrip(t *testing.T) {
 				t.Errorf("round-trip Args mismatch (-original +reparsed):\n  input: %s\n  string(): %s\n%s",
 					input, str, diff)
 			}
-
-			// Compare AdvArgs via public Raw() accessor
 			if diff := cmp.Diff(cmd1.AdvArgs.Raw(), cmd2.AdvArgs.Raw()); diff != "" {
 				t.Errorf("round-trip AdvArgs mismatch (-original +reparsed):\n  input: %s\n  string(): %s\n%s",
 					input, str, diff)
