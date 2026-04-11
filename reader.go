@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -113,29 +114,29 @@ func argNeedsQuoting(s string) bool {
 // and wraps the arg in double quotes.
 func escapeArg(s string) string {
 	var b strings.Builder
-	b.WriteByte('"')
+	_, _ = b.WriteRune('"')
 	for _, ch := range s {
 		switch ch {
 		case '"':
-			b.WriteRune(SymEscapeSeq)
-			b.WriteByte('"')
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('"')
 		case '\n':
-			b.WriteRune(SymEscapeSeq)
-			b.WriteByte('n')
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('n')
 		case '\r':
-			b.WriteRune(SymEscapeSeq)
-			b.WriteByte('r')
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('r')
 		case '\t':
-			b.WriteRune(SymEscapeSeq)
-			b.WriteByte('t')
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune('t')
 		case SymEscapeSeq:
-			b.WriteRune(SymEscapeSeq)
-			b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune(SymEscapeSeq)
 		default:
-			b.WriteRune(ch)
+			_, _ = b.WriteRune(ch)
 		}
 	}
-	b.WriteByte('"')
+	_, _ = b.WriteRune('"')
 	return b.String()
 }
 
@@ -144,44 +145,55 @@ func escapeArg(s string) string {
 // equivalent Command.
 func (c Command) String() string {
 	var b strings.Builder
-	b.WriteString("**")
-	b.WriteString(c.Name)
+	_, _ = b.WriteString("**")
+	_, _ = b.WriteString(c.Name)
 
 	if len(c.Args) > 0 {
-		b.WriteRune(SymArgStart)
+		_, _ = b.WriteRune(SymArgStart)
 
 		if isInputMacroCmd(c.Name) {
 			// Input macro commands concatenate args directly
 			for _, arg := range c.Args {
-				b.WriteString(arg)
+				_, _ = b.WriteString(arg)
 			}
 		} else {
 			for i, arg := range c.Args {
 				if i > 0 {
-					b.WriteRune(SymArgSep)
+					_, _ = b.WriteRune(SymArgSep)
 				}
 				if argNeedsQuoting(arg) {
-					b.WriteString(escapeArg(arg))
+					_, _ = b.WriteString(escapeArg(arg))
 				} else {
-					b.WriteString(arg)
+					_, _ = b.WriteString(arg)
 				}
 			}
 		}
 	}
 
 	if !c.AdvArgs.IsEmpty() {
-		b.WriteRune(SymAdvArgStart)
-		first := true
-		c.AdvArgs.Range(func(key Key, value string) bool {
-			if !first {
-				b.WriteRune(SymAdvArgSep)
-			}
-			first = false
-			b.WriteString(string(key))
-			b.WriteRune(SymAdvArgEq)
-			b.WriteString(value)
+		_, _ = b.WriteRune(SymAdvArgStart)
+
+		// Collect and sort keys for deterministic output
+		var keys []string
+		c.AdvArgs.Range(func(key Key, _ string) bool {
+			keys = append(keys, string(key))
 			return true
 		})
+		sort.Strings(keys)
+
+		for i, key := range keys {
+			if i > 0 {
+				_, _ = b.WriteRune(SymAdvArgSep)
+			}
+			_, _ = b.WriteString(key)
+			_, _ = b.WriteRune(SymAdvArgEq)
+			value := c.AdvArgs.Get(Key(key))
+			if argNeedsQuoting(value) {
+				_, _ = b.WriteString(escapeArg(value))
+			} else {
+				_, _ = b.WriteString(value)
+			}
+		}
 	}
 
 	return b.String()

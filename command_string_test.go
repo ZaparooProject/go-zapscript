@@ -20,7 +20,6 @@ import (
 
 	"github.com/ZaparooProject/go-zapscript"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestCommandString(t *testing.T) {
@@ -28,8 +27,8 @@ func TestCommandString(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cmd  zapscript.Command
 		want string
+		cmd  zapscript.Command
 	}{
 		{
 			name: "name only",
@@ -81,6 +80,15 @@ func TestCommandString(t *testing.T) {
 			want: "**launch:game.exe?platform=win",
 		},
 		{
+			name: "advanced args sorted",
+			cmd: zapscript.Command{
+				Name:    "launch",
+				Args:    []string{"game.exe"},
+				AdvArgs: zapscript.NewAdvArgs(map[string]string{"platform": "win", "fullscreen": "yes", "lang": "en"}),
+			},
+			want: "**launch:game.exe?fullscreen=yes&lang=en&platform=win",
+		},
+		{
 			name: "advanced args only",
 			cmd: zapscript.Command{
 				Name:    "example",
@@ -109,8 +117,8 @@ func TestCommandString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := tt.cmd.String()
-			if got != tt.want {
-				t.Errorf("Command.String() = %q, want %q", got, tt.want)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Command.String() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -160,9 +168,22 @@ func TestCommandString_RoundTrip(t *testing.T) {
 				t.Fatalf("expected 1 command from re-parse, got %d", len(script2.Cmds))
 			}
 
-			// Compare
-			if diff := cmp.Diff(script1.Cmds[0], script2.Cmds[0], cmpopts.IgnoreUnexported(zapscript.AdvArgs{})); diff != "" {
-				t.Errorf("round-trip mismatch (-original +reparsed):\n  input:    %s\n  string(): %s\n%s",
+			cmd1 := script1.Cmds[0]
+			cmd2 := script2.Cmds[0]
+
+			// Compare Name and Args
+			if diff := cmp.Diff(cmd1.Name, cmd2.Name); diff != "" {
+				t.Errorf("round-trip Name mismatch (-original +reparsed):\n  input: %s\n  string(): %s\n%s",
+					input, str, diff)
+			}
+			if diff := cmp.Diff(cmd1.Args, cmd2.Args); diff != "" {
+				t.Errorf("round-trip Args mismatch (-original +reparsed):\n  input: %s\n  string(): %s\n%s",
+					input, str, diff)
+			}
+
+			// Compare AdvArgs via public Raw() accessor
+			if diff := cmp.Diff(cmd1.AdvArgs.Raw(), cmd2.AdvArgs.Raw()); diff != "" {
+				t.Errorf("round-trip AdvArgs mismatch (-original +reparsed):\n  input: %s\n  string(): %s\n%s",
 					input, str, diff)
 			}
 		})
