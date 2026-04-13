@@ -161,6 +161,86 @@ func TestParseInputMacroArgs(t *testing.T) {
 				},
 			},
 		},
+		// Expression handling in input macros
+		{
+			name:  "input with expression",
+			input: `**input.keyboard:[[var]]`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "input.keyboard", Args: []string{zapscript.TokExpStart + "var" + zapscript.TokExprEnd}},
+				},
+			},
+		},
+		{
+			name:  "input with expression between chars",
+			input: `**input.keyboard:a[[var]]b`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "input.keyboard", Args: []string{
+						"a", zapscript.TokExpStart + "var" + zapscript.TokExprEnd, "b",
+					}},
+				},
+			},
+		},
+		{
+			name:  "input with single bracket not expression",
+			input: `**input.keyboard:a[b`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "input.keyboard", Args: []string{"a", "[", "b"}},
+				},
+			},
+		},
+		{
+			name:  "input with multiple expressions",
+			input: `**input.keyboard:[[a]][[b]]`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "input.keyboard", Args: []string{
+						zapscript.TokExpStart + "a" + zapscript.TokExprEnd,
+						zapscript.TokExpStart + "b" + zapscript.TokExprEnd,
+					}},
+				},
+			},
+		},
+		{
+			name:  "input with expression and advanced args",
+			input: `**input.keyboard:[[var]]?delay=100`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{
+						Name:    "input.keyboard",
+						Args:    []string{zapscript.TokExpStart + "var" + zapscript.TokExprEnd},
+						AdvArgs: zapscript.NewAdvArgs(map[string]string{"delay": "100"}),
+					},
+				},
+			},
+		},
+		{
+			name:  "input with escape sequence and expression",
+			input: `**input.keyboard:\n[[var]]`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "input.keyboard", Args: []string{
+						"n", zapscript.TokExpStart + "var" + zapscript.TokExprEnd,
+					}},
+				},
+			},
+		},
+		{
+			name:    "input with unmatched expression",
+			input:   `**input.keyboard:[[var`,
+			wantErr: zapscript.ErrUnmatchedExpression,
+		},
+		{
+			name:  "input gamepad with expression",
+			input: `**input.gamepad:[[var]]`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "input.gamepad", Args: []string{zapscript.TokExpStart + "var" + zapscript.TokExprEnd}},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
