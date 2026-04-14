@@ -204,8 +204,7 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 		cmd := Command{
 			Name: ZapScriptCmdLaunch,
 		}
-		// hasArgs filters out empty-only args from adv arg fallback
-		if hasArgs(args) {
+		if len(args) > 0 {
 			cmd.Args = args
 		}
 		if len(advArgs) > 0 {

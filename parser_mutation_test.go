@@ -818,6 +818,25 @@ func TestParseArgsMutations(t *testing.T) {
 				},
 			},
 		},
+		// Explicit empty quoted args are preserved
+		{
+			name:  "explicit empty double-quoted arg",
+			input: `**cmd:""`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "cmd", Args: []string{""}},
+				},
+			},
+		},
+		{
+			name:  "explicit empty single-quoted arg",
+			input: `**cmd:''`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "cmd", Args: []string{""}},
+				},
+			},
+		},
 		// Escape sequence before comma
 		{
 			name:  "escaped comma in arg",

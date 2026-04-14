@@ -96,15 +96,6 @@ type Command struct {
 	Args    []string
 }
 
-func hasArgs(args []string) bool {
-	for _, arg := range args {
-		if arg != "" {
-			return true
-		}
-	}
-	return false
-}
-
 // argNeedsQuoting returns true if the arg contains characters that require
 // double-quoting to be safely represented in ZapScript.
 func argNeedsQuoting(s string) bool {
@@ -164,7 +155,7 @@ func (c Command) String() string {
 	if len(c.Args) > 0 {
 		_, _ = b.WriteRune(SymArgStart)
 
-		if isInputMacroCmd(c.Name) {
+		if isInputMacroCmd(normalizeCmdName(c.Name)) {
 			// Input macro commands concatenate args directly
 			for _, arg := range c.Args {
 				if len(arg) > 1 && rune(arg[0]) == SymInputMacroExtStart &&
