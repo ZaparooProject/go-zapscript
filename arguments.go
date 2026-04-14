@@ -83,6 +83,7 @@ func (sr *ScriptReader) parseInputMacroArg() (args []string, advArgs map[string]
 	args = make([]string, 0)
 	advArgs = make(map[string]string)
 
+macroLoop:
 	for {
 		ch, err := sr.read()
 		if err != nil {
@@ -111,7 +112,8 @@ func (sr *ScriptReader) parseInputMacroArg() (args []string, advArgs map[string]
 			break
 		}
 
-		if ch == SymInputMacroExtStart {
+		switch ch {
+		case SymInputMacroExtStart:
 			extName := string(ch)
 			var extBuilder strings.Builder
 			for {
@@ -131,7 +133,14 @@ func (sr *ScriptReader) parseInputMacroArg() (args []string, advArgs map[string]
 			extName += extBuilder.String()
 			args = append(args, extName)
 			continue
-		} else if ch == SymAdvArgStart {
+		case SymExpressionStart:
+			exprValue, exprErr := sr.parseExpression()
+			if exprErr != nil {
+				return args, advArgs, exprErr
+			}
+			args = append(args, exprValue)
+			continue
+		case SymAdvArgStart:
 			newAdvArgs, buf, err := sr.parseAdvArgs()
 			if errors.Is(err, ErrInvalidAdvArgName) {
 				// if an adv arg name is invalid, fallback on treating it
@@ -147,10 +156,10 @@ func (sr *ScriptReader) parseInputMacroArg() (args []string, advArgs map[string]
 			advArgs = newAdvArgs
 
 			// advanced args are always the last part of a command
-			break
+			break macroLoop
+		default:
+			args = append(args, string(ch))
 		}
-
-		args = append(args, string(ch))
 	}
 
 	return args, advArgs, nil
@@ -269,6 +278,9 @@ func (sr *ScriptReader) parseArgs(
 	advArgs = make(map[string]string)
 	currentArg := prefix
 	argStart := sr.pos
+	// tracks whether content was explicitly written, distinguishing
+	// "**cmd:" (no content, no arg) from "**cmd:''" (explicit empty arg)
+	argWritten := prefix != ""
 
 argsLoop:
 	for {
@@ -286,6 +298,7 @@ argsLoop:
 				return args, advArgs, quotedErr
 			}
 			currentArg = quotedArg
+			argWritten = true
 			continue argsLoop
 		case argStart == sr.pos-1 && ch == SymJSONStart:
 			jsonArg, jsonErr := sr.parseJSONArg()
@@ -293,6 +306,7 @@ argsLoop:
 				return args, advArgs, jsonErr
 			}
 			currentArg = jsonArg
+			argWritten = true
 			continue argsLoop
 		case ch == SymEscapeSeq:
 			// escaping next character
@@ -301,9 +315,11 @@ argsLoop:
 				return args, advArgs, escapeErr
 			} else if next == "" {
 				currentArg += string(SymEscapeSeq)
+				argWritten = true
 				continue argsLoop
 			}
 			currentArg += next
+			argWritten = true
 			continue argsLoop
 		}
 
@@ -321,6 +337,7 @@ argsLoop:
 			args = append(args, currentArg)
 			currentArg = ""
 			argStart = sr.pos
+			argWritten = false
 			continue argsLoop
 		case ch == SymAdvArgStart:
 			newAdvArgs, buf, err := sr.parseAdvArgs()
@@ -344,18 +361,21 @@ argsLoop:
 				return args, advArgs, err
 			}
 			currentArg += exprValue
+			argWritten = true
 			continue argsLoop
 		default:
 			currentArg += string(ch)
+			if !isWhitespace(ch) {
+				argWritten = true
+			}
 			continue argsLoop
 		}
 	}
 
 	currentArg = strings.TrimSpace(currentArg)
-	if !onlyAdvArgs {
-		// if a cmd was called with ":" it will always have at least 1 blank arg
+	if !onlyAdvArgs && (currentArg != "" || argWritten) {
 		args = append(args, currentArg)
-	} else if currentArg != "" {
+	} else if onlyAdvArgs && currentArg != "" {
 		// fallback content from invalid adv args should still be preserved
 		args = append(args, currentArg)
 	}

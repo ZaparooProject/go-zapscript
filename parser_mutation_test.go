@@ -808,10 +808,29 @@ func TestParseArgsMutations(t *testing.T) {
 				},
 			},
 		},
-		// Empty arg
+		// Colon with no content produces no args
 		{
 			name:  "empty arg from colon only",
 			input: `**cmd:`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "cmd"},
+				},
+			},
+		},
+		// Explicit empty quoted args are preserved
+		{
+			name:  "explicit empty double-quoted arg",
+			input: `**cmd:""`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{Name: "cmd", Args: []string{""}},
+				},
+			},
+		},
+		{
+			name:  "explicit empty single-quoted arg",
+			input: `**cmd:''`,
 			want: zapscript.Script{
 				Cmds: []zapscript.Command{
 					{Name: "cmd", Args: []string{""}},

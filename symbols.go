@@ -15,7 +15,10 @@
 
 package zapscript
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 var (
 	ErrUnexpectedEOF          = errors.New("unexpected end of file")
@@ -66,6 +69,10 @@ const (
 )
 
 var eof = rune(0)
+
+func normalizeCmdName(name string) string {
+	return strings.ToLower(name)
+}
 
 func isCmdName(ch rune) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '.'
