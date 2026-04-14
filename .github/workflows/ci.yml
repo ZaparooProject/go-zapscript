@@ -61,27 +61,6 @@ jobs:
     - name: Run tests
       run: go test -v -race -timeout=10m ./...
 
-  fuzz:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-    - name: Set up Go
-      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
-      with:
-        go-version-file: go.mod
-        cache: true
-
-    - name: Run fuzz tests (quick)
-      run: |
-        # Run each fuzz test for 10 seconds to catch obvious issues
-        go test -fuzz=FuzzParseScript -fuzztime=10s .
-        go test -fuzz=FuzzParseExpressions -fuzztime=10s .
-        go test -fuzz=FuzzEvalExpressions -fuzztime=10s .
-
   lint:
     needs: changes
     if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'

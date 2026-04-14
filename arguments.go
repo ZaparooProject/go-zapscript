@@ -278,6 +278,9 @@ func (sr *ScriptReader) parseArgs(
 	advArgs = make(map[string]string)
 	currentArg := prefix
 	argStart := sr.pos
+	// tracks whether content was explicitly written, distinguishing
+	// "**cmd:" (no content, no arg) from "**cmd:''" (explicit empty arg)
+	argWritten := prefix != ""
 
 argsLoop:
 	for {
@@ -295,6 +298,7 @@ argsLoop:
 				return args, advArgs, quotedErr
 			}
 			currentArg = quotedArg
+			argWritten = true
 			continue argsLoop
 		case argStart == sr.pos-1 && ch == SymJSONStart:
 			jsonArg, jsonErr := sr.parseJSONArg()
@@ -302,6 +306,7 @@ argsLoop:
 				return args, advArgs, jsonErr
 			}
 			currentArg = jsonArg
+			argWritten = true
 			continue argsLoop
 		case ch == SymEscapeSeq:
 			// escaping next character
@@ -310,9 +315,11 @@ argsLoop:
 				return args, advArgs, escapeErr
 			} else if next == "" {
 				currentArg += string(SymEscapeSeq)
+				argWritten = true
 				continue argsLoop
 			}
 			currentArg += next
+			argWritten = true
 			continue argsLoop
 		}
 
@@ -330,6 +337,7 @@ argsLoop:
 			args = append(args, currentArg)
 			currentArg = ""
 			argStart = sr.pos
+			argWritten = false
 			continue argsLoop
 		case ch == SymAdvArgStart:
 			newAdvArgs, buf, err := sr.parseAdvArgs()
@@ -353,18 +361,21 @@ argsLoop:
 				return args, advArgs, err
 			}
 			currentArg += exprValue
+			argWritten = true
 			continue argsLoop
 		default:
 			currentArg += string(ch)
+			if !isWhitespace(ch) {
+				argWritten = true
+			}
 			continue argsLoop
 		}
 	}
 
 	currentArg = strings.TrimSpace(currentArg)
-	if !onlyAdvArgs {
-		// if a cmd was called with ":" it will always have at least 1 blank arg
+	if !onlyAdvArgs && (currentArg != "" || argWritten) {
 		args = append(args, currentArg)
-	} else if currentArg != "" {
+	} else if onlyAdvArgs && currentArg != "" {
 		// fallback content from invalid adv args should still be preserved
 		args = append(args, currentArg)
 	}

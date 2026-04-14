@@ -15,3 +15,28 @@ tasks:
     desc: Run tests
     cmds:
       - go test -race ./...
+
+  fuzz:
+    desc: Run fuzz tests (default 30s per test, use FUZZ_TIME to override)
+    vars:
+      FUZZ_TIME: '{{default "30s" .FUZZ_TIME}}'
+    cmds:
+      - |
+        exit_code=0
+        targets=(
+          "FuzzParseScript"
+          "FuzzParseExpressions"
+          "FuzzEvalExpressions"
+          "FuzzParseTagFilters"
+          "FuzzCommandString"
+        )
+        for target in "${targets[@]}"; do
+          echo "=== ${target} ==="
+          if go test -run "^$" -fuzz="${target}" -fuzztime={{.FUZZ_TIME}} .; then
+            echo "PASS: ${target}"
+          else
+            echo "FAIL: ${target}"
+            exit_code=1
+          fi
+        done
+        exit $exit_code

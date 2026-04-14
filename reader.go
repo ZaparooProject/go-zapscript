@@ -96,14 +96,24 @@ type Command struct {
 	Args    []string
 }
 
+func hasArgs(args []string) bool {
+	for _, arg := range args {
+		if arg != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // argNeedsQuoting returns true if the arg contains characters that require
 // double-quoting to be safely represented in ZapScript.
 func argNeedsQuoting(s string) bool {
 	for _, ch := range s {
 		switch ch {
 		case SymArgSep, SymArgStart, SymAdvArgStart, SymAdvArgSep,
-			SymAdvArgEq, SymArgDoubleQuote, SymCmdSep, SymEscapeSeq,
-			'\n', '\r', '\t':
+			SymAdvArgEq, SymArgDoubleQuote, SymArgSingleQuote, SymCmdSep,
+			SymEscapeSeq, SymCmdStart, SymExpressionStart, SymTraitsStart,
+			SymJSONStart, '\n', '\r', '\t':
 			return true
 		}
 	}
@@ -132,6 +142,9 @@ func escapeArg(s string) string {
 		case SymEscapeSeq:
 			_, _ = b.WriteRune(SymEscapeSeq)
 			_, _ = b.WriteRune(SymEscapeSeq)
+		case SymExpressionStart:
+			_, _ = b.WriteRune(SymEscapeSeq)
+			_, _ = b.WriteRune(SymExpressionStart)
 		default:
 			_, _ = b.WriteRune(ch)
 		}
@@ -154,14 +167,30 @@ func (c Command) String() string {
 		if isInputMacroCmd(c.Name) {
 			// Input macro commands concatenate args directly
 			for _, arg := range c.Args {
-				_, _ = b.WriteString(arg)
+				if len(arg) > 1 && rune(arg[0]) == SymInputMacroExtStart &&
+					rune(arg[len(arg)-1]) == SymInputMacroExtEnd {
+					_, _ = b.WriteString(arg)
+				} else {
+					for _, ch := range arg {
+						switch ch {
+						case SymInputMacroEscapeSeq:
+							_, _ = b.WriteRune(SymInputMacroEscapeSeq)
+							_, _ = b.WriteRune(ch)
+						case SymAdvArgStart, SymExpressionStart, SymInputMacroExtStart, SymCmdSep:
+							_, _ = b.WriteRune(SymInputMacroEscapeSeq)
+							_, _ = b.WriteRune(ch)
+						default:
+							_, _ = b.WriteRune(ch)
+						}
+					}
+				}
 			}
 		} else {
 			for i, arg := range c.Args {
 				if i > 0 {
 					_, _ = b.WriteRune(SymArgSep)
 				}
-				if argNeedsQuoting(arg) {
+				if arg == "" || argNeedsQuoting(arg) {
 					_, _ = b.WriteString(escapeArg(arg))
 				} else {
 					_, _ = b.WriteString(arg)

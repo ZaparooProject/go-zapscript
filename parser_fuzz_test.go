@@ -17,6 +17,8 @@ package zapscript
 
 import (
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // FuzzParseScript tests that ParseScript never panics on arbitrary input.
@@ -179,5 +181,122 @@ func FuzzEvalExpressions(f *testing.F) {
 		evalParser := NewParser(parsed)
 		// Should not panic
 		_, _ = evalParser.EvalExpressions(env)
+	})
+}
+
+// FuzzParseTagFilters tests that ParseTagFilters never panics on arbitrary input.
+// Tag filter parsing handles operator prefixes, type:value splitting, and normalization.
+func FuzzParseTagFilters(f *testing.F) {
+	seeds := []string{
+		// Valid filters
+		`region:usa`,
+		`+genre:rpg`,
+		`-unfinished:demo`,
+		`~lang:en`,
+		// Multiple filters
+		`region:usa,genre:rpg`,
+		`+genre:rpg,-unfinished:demo,~lang:en,~lang:es`,
+		// Edge cases
+		``,
+		`,`,
+		`,,,`,
+		`+`,
+		`-`,
+		`~`,
+		`nocolon`,
+		`:`,
+		`:value`,
+		`type:`,
+		`::`,
+		// Whitespace
+		` region : usa `,
+		`  ,  ,  `,
+		// Special characters
+		`type:value with spaces`,
+		`type:1.2.3`,
+		`type:日本語`, //nolint:gosmopolitan // Japanese test case
+		`type:émoji🎮`,
+		// Long input
+		`a:b,` + string(make([]byte, 500)),
+	}
+
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(_ *testing.T, input string) {
+		// Should not panic
+		_, _ = ParseTagFilters(input)
+	})
+}
+
+// FuzzCommandString tests Command.String() round-trip: parse → string → reparse.
+// If a command parses successfully and serializes, reparsing should produce
+// an equivalent command structure.
+func FuzzCommandString(f *testing.F) {
+	seeds := []string{
+		// Basic commands
+		`**launch:game.rom`,
+		`**delay:1000`,
+		`**echo:hello`,
+		// Multiple args
+		`**cmd:arg1,arg2,arg3`,
+		// Advanced args
+		`**cmd:arg?key=value`,
+		`**cmd:arg?key=value&other=thing`,
+		// Quoted args
+		`**cmd:"quoted arg"`,
+		`**cmd:'single quotes'`,
+		// Input macro commands
+		`**input.keyboard:abc`,
+		`**input.gamepad:abxy`,
+		`**input.keyboard:a{enter}b`,
+		// No args
+		`**stop`,
+		// Expressions (these won't round-trip but shouldn't panic)
+		`**launch:[[game_path]]`,
+		// Escapes
+		`**cmd:arg^,with^,commas`,
+		// Edge cases
+		`**cmd:`,
+		`**cmd:a`,
+	}
+
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, input string) {
+		p := NewParser(input)
+		script, err := p.ParseScript()
+		if err != nil {
+			return
+		}
+
+		for _, cmd := range script.Cmds {
+			str := cmd.String()
+
+			// Reparse the serialized command
+			p2 := NewParser(str)
+			script2, err := p2.ParseScript()
+			if err != nil {
+				t.Fatalf("round-trip reparse failed: input=%q → string=%q → error=%v", input, str, err)
+			}
+
+			if len(script2.Cmds) != 1 {
+				t.Fatalf("round-trip produced %d commands, want 1: input=%q → string=%q", len(script2.Cmds), input, str)
+			}
+
+			got := script2.Cmds[0]
+			if diff := cmp.Diff(cmd.Name, got.Name); diff != "" {
+				t.Errorf("round-trip name mismatch (-want +got):\n%s\ninput=%q → string=%q", diff, input, str)
+			}
+			if diff := cmp.Diff(cmd.Args, got.Args); diff != "" {
+				t.Errorf("round-trip args mismatch (-want +got):\n%s\ninput=%q → string=%q", diff, input, str)
+			}
+			if diff := cmp.Diff(cmd.AdvArgs, got.AdvArgs, cmp.AllowUnexported(AdvArgs{})); diff != "" {
+				t.Errorf("round-trip advargs mismatch (-want +got):\n%s\ninput=%q → string=%q", diff, input, str)
+			}
+		}
 	})
 }

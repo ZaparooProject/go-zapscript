@@ -135,6 +135,8 @@ commandLoop:
 				break commandLoop
 			}
 
+			cmd.Name = normalizeCmdName(cmd.Name)
+
 			onlyAdvArgs := false
 			if ch == SymAdvArgStart {
 				// roll it back to trigger adv arg parsing in parseArgs
@@ -180,7 +182,7 @@ commandLoop:
 		return cmd, string(buf), ErrEmptyCmdName
 	}
 
-	cmd.Name = strings.ToLower(cmd.Name)
+	cmd.Name = normalizeCmdName(cmd.Name)
 
 	return cmd, string(buf), nil
 }
@@ -201,7 +203,10 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 		}
 		cmd := Command{
 			Name: ZapScriptCmdLaunch,
-			Args: args,
+		}
+		// hasArgs filters out empty-only args from adv arg fallback
+		if hasArgs(args) {
+			cmd.Args = args
 		}
 		if len(advArgs) > 0 {
 			cmd.AdvArgs = NewAdvArgs(advArgs)
