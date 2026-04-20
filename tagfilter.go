@@ -22,14 +22,16 @@ import (
 )
 
 var (
-	reColonSpacing = regexp.MustCompile(`\s*:\s*`)
-	reSpecialChars = regexp.MustCompile(`[^a-z0-9:,+\-]`)
+	reColonSpacing    = regexp.MustCompile(`\s*:\s*`)
+	reSpecialChars    = regexp.MustCompile(`[^a-z0-9:,+\-]`)
+	reConsecutiveDash = regexp.MustCompile(`-{2,}`)
 )
 
 // NormalizeTag normalizes a tag string for consistent matching.
 // Applied to BOTH type and value parts separately.
 // Rules: trim whitespace, normalize colon spacing, lowercase, spaces→dashes,
-// periods→dashes, and remove special chars (except colon, dash, and comma).
+// periods→dashes, remove special chars (except colon, dash, and comma),
+// and collapse consecutive dashes into one.
 func NormalizeTag(s string) string {
 	// 1. Trim whitespace
 	s = strings.TrimSpace(s)
@@ -49,6 +51,9 @@ func NormalizeTag(s string) string {
 	// 6. Remove other special chars (except colon, dash, and comma)
 	// Keep: a-z, 0-9, dash, colon, comma
 	s = reSpecialChars.ReplaceAllString(s, "")
+
+	// 7. Collapse consecutive dashes into one (e.g. "V. Gabriel" → "v--gabriel" → "v-gabriel")
+	s = reConsecutiveDash.ReplaceAllString(s, "-")
 
 	return s
 }
