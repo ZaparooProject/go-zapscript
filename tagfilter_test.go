@@ -64,6 +64,11 @@ func TestNormalizeTag(t *testing.T) {
 			input: "my-tag:value,other",
 			want:  "my-tag:value,other",
 		},
+		{
+			name:  "consecutive dashes collapsed",
+			input: "V. Gabriel",
+			want:  "v-gabriel",
+		},
 	}
 
 	for _, tt := range tests {
