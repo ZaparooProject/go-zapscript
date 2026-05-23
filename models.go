@@ -37,6 +37,7 @@ const (
 	ZapScriptCmdExecute    = "execute"
 	ZapScriptCmdDelay      = "delay"
 	ZapScriptCmdEvaluate   = "evaluate"
+	ZapScriptCmdWrite      = "write"
 	ZapScriptCmdStop       = "stop"
 	ZapScriptCmdEcho       = "echo"
 	ZapScriptCmdControl    = "control"
@@ -97,6 +98,10 @@ type CmdLaunchArgs struct {
 	URL       *string `json:"url"`
 	PreNotice *string `json:"preNotice"`
 	Path      string  `json:"path" arg:"position=1"`
+}
+
+type CmdWriteArgs struct {
+	Payload string `json:"payload" arg:"position=1"`
 }
 
 type CmdNotice struct {

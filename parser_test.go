@@ -61,6 +61,18 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			name:  "write command",
+			input: `**write:'**launch:/games/snes/zelda.sfc||**echo:written'`,
+			want: zapscript.Script{
+				Cmds: []zapscript.Command{
+					{
+						Name: zapscript.ZapScriptCmdWrite,
+						Args: []string{"**launch:/games/snes/zelda.sfc||**echo:written"},
+					},
+				},
+			},
+		},
+		{
 			name:  "two commands separated",
 			input: `**first:1,2||**second:3,4`,
 			want: zapscript.Script{
