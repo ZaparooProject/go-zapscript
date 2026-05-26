@@ -71,18 +71,13 @@ type GlobalArgs struct {
 	When string `advarg:"when"`
 }
 
-// LaunchSetNameArgs contains optional launcher set-name advanced arguments.
-type LaunchSetNameArgs struct {
+// LaunchArgs contains advanced arguments for the launch command.
+type LaunchArgs struct {
+	GlobalArgs
 	// SetName specifies a platform-defined launch profile/core name override.
 	SetName string `advarg:"set_name"`
 	// SetNameSameDir controls whether SetName should keep the original game directory.
 	SetNameSameDir string `advarg:"set_name_same_dir"`
-}
-
-// LaunchArgs contains advanced arguments for the launch command.
-type LaunchArgs struct {
-	GlobalArgs
-	LaunchSetNameArgs
 	// Launcher overrides the default launcher by ID.
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// System specifies the target system for path resolution.
@@ -98,7 +93,10 @@ type LaunchArgs struct {
 // LaunchRandomArgs contains advanced arguments for the launch.random command.
 type LaunchRandomArgs struct {
 	GlobalArgs
-	LaunchSetNameArgs
+	// SetName specifies a platform-defined launch profile/core name override.
+	SetName string `advarg:"set_name"`
+	// SetNameSameDir controls whether SetName should keep the original game directory.
+	SetNameSameDir string `advarg:"set_name_same_dir"`
 	// Launcher overrides the default launcher by ID.
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
@@ -110,7 +108,10 @@ type LaunchRandomArgs struct {
 // LaunchSearchArgs contains advanced arguments for the launch.search command.
 type LaunchSearchArgs struct {
 	GlobalArgs
-	LaunchSetNameArgs
+	// SetName specifies a platform-defined launch profile/core name override.
+	SetName string `advarg:"set_name"`
+	// SetNameSameDir controls whether SetName should keep the original game directory.
+	SetNameSameDir string `advarg:"set_name_same_dir"`
 	// Launcher overrides the default launcher by ID.
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
@@ -122,7 +123,10 @@ type LaunchSearchArgs struct {
 // LaunchTitleArgs contains advanced arguments for the launch.title command.
 type LaunchTitleArgs struct {
 	GlobalArgs
-	LaunchSetNameArgs
+	// SetName specifies a platform-defined launch profile/core name override.
+	SetName string `advarg:"set_name"`
+	// SetNameSameDir controls whether SetName should keep the original game directory.
+	SetNameSameDir string `advarg:"set_name_same_dir"`
 	// Launcher overrides the default launcher by ID.
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
@@ -134,7 +138,10 @@ type LaunchTitleArgs struct {
 // LaunchLastArgs contains advanced arguments for the launch.last command.
 type LaunchLastArgs struct {
 	GlobalArgs
-	LaunchSetNameArgs
+	// SetName specifies a platform-defined launch profile/core name override.
+	SetName string `advarg:"set_name"`
+	// SetNameSameDir controls whether SetName should keep the original game directory.
+	SetNameSameDir string `advarg:"set_name_same_dir"`
 	// Launcher overrides the default launcher by ID.
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
