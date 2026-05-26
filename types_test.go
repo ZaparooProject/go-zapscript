@@ -21,10 +21,8 @@ func TestLaunchArgsSetNameFields(t *testing.T) {
 	t.Parallel()
 
 	args := LaunchArgs{
-		LaunchSetNameArgs: LaunchSetNameArgs{
-			SetName:        "RA_NES",
-			SetNameSameDir: "1",
-		},
+		SetName:        "RA_NES",
+		SetNameSameDir: "1",
 	}
 
 	if args.SetName != "RA_NES" {
