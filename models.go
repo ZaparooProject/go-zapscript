@@ -56,6 +56,8 @@ const (
 	ZapScriptCmdInputGamepad  = "input.gamepad"
 	ZapScriptCmdInputCoinP1   = "input.coinp1"
 	ZapScriptCmdInputCoinP2   = "input.coinp2"
+	ZapScriptCmdInputCoinP3   = "input.coinp3"
+	ZapScriptCmdInputCoinP4   = "input.coinp4"
 
 	ZapScriptCmdUINotice = "ui.notice"
 	ZapScriptCmdUIPicker = "ui.picker"
