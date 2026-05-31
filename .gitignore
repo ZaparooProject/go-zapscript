@@ -1,5 +1,6 @@
 .claude/
 CLAUDE.md
+.pi/
 
 # Test and coverage
 coverage.out
