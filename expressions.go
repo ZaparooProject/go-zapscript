@@ -61,6 +61,14 @@ type ExprEnvLaunching struct {
 	LauncherID string `expr:"launcher_id" json:"launcher_id"`
 }
 
+// ExprEnvHook represents hook context for expression evaluation.
+//
+//nolint:tagliatelle // JSON uses snake_case to match expression env naming
+type ExprEnvHook struct {
+	Name           string `expr:"name" json:"name"`
+	FirstBootStart bool   `expr:"first_boot_start" json:"first_boot_start"`
+}
+
 //nolint:tagliatelle // JSON uses snake_case to match expression env naming
 type ArgExprEnv struct {
 	ActiveMedia  ExprEnvActiveMedia `expr:"active_media" json:"active_media"`
@@ -71,7 +79,9 @@ type ArgExprEnv struct {
 	Platform     string             `expr:"platform" json:"platform"`
 	Version      string             `expr:"version" json:"version"`
 	ScanMode     string             `expr:"scan_mode" json:"scan_mode"`
+	Hook         ExprEnvHook        `expr:"hook" json:"hook,omitempty"`
 	MediaPlaying bool               `expr:"media_playing" json:"media_playing"`
+	MediaReady   bool               `expr:"media_ready" json:"media_ready"`
 }
 
 //nolint:tagliatelle // JSON uses snake_case to match expression env naming

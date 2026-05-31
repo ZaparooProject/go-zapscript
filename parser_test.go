@@ -399,6 +399,21 @@ func TestPostProcess(t *testing.T) {
 			want:  `something true`,
 		},
 		{
+			name:  "test expression hook name",
+			input: zapscript.TokExpStart + "hook.name" + zapscript.TokExprEnd,
+			want:  `startup`,
+		},
+		{
+			name:  "test expression hook first boot start",
+			input: zapscript.TokExpStart + "hook.first_boot_start" + zapscript.TokExprEnd,
+			want:  `true`,
+		},
+		{
+			name:  "test expression media ready",
+			input: zapscript.TokExpStart + "media_ready" + zapscript.TokExprEnd,
+			want:  `true`,
+		},
+		{
 			name:    "bad return type",
 			input:   zapscript.TokExpStart + "device" + zapscript.TokExprEnd,
 			wantErr: zapscript.ErrBadExpressionReturn,
@@ -422,7 +437,12 @@ func TestPostProcess(t *testing.T) {
 				Platform:     "mister",
 				Version:      "1.2.3",
 				MediaPlaying: true,
+				MediaReady:   true,
 				ScanMode:     "tap",
+				Hook: zapscript.ExprEnvHook{
+					Name:           "startup",
+					FirstBootStart: true,
+				},
 				Device: zapscript.ExprEnvDevice{
 					Hostname: "test-device",
 					OS:       "linux",

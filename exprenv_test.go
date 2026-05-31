@@ -30,9 +30,15 @@ func TestArgExprEnv_JSONSerialization(t *testing.T) {
 	t.Parallel()
 
 	env := zapscript.ArgExprEnv{
-		Platform: "mister",
-		Version:  "2.0.0",
-		ScanMode: "hold",
+		Platform:     "mister",
+		Version:      "2.0.0",
+		ScanMode:     "hold",
+		MediaPlaying: true,
+		MediaReady:   true,
+		Hook: zapscript.ExprEnvHook{
+			Name:           "startup",
+			FirstBootStart: true,
+		},
 		Device: zapscript.ExprEnvDevice{
 			Hostname: "mister",
 			OS:       "linux",
@@ -43,7 +49,6 @@ func TestArgExprEnv_JSONSerialization(t *testing.T) {
 			Value: "**launch:snes/mario",
 			Data:  "extra-data",
 		},
-		MediaPlaying: true,
 		ActiveMedia: zapscript.ExprEnvActiveMedia{
 			LauncherID: "retroarch",
 			SystemID:   "snes",
@@ -63,6 +68,9 @@ func TestArgExprEnv_JSONSerialization(t *testing.T) {
 	assert.Contains(t, jsonStr, `"version"`, "should contain version field")
 	assert.Contains(t, jsonStr, `"scan_mode"`, "should contain scan_mode field")
 	assert.Contains(t, jsonStr, `"media_playing"`, "should contain media_playing field")
+	assert.Contains(t, jsonStr, `"media_ready"`, "should contain media_ready field")
+	assert.Contains(t, jsonStr, `"hook"`, "should contain hook field")
+	assert.Contains(t, jsonStr, `"first_boot_start"`, "should contain first_boot_start field")
 	assert.Contains(t, jsonStr, `"active_media"`, "should contain active_media field")
 	assert.Contains(t, jsonStr, `"last_scanned"`, "should contain last_scanned field")
 	assert.Contains(t, jsonStr, `"launcher_id"`, "should contain launcher_id field")
@@ -85,6 +93,11 @@ func TestArgExprEnv_JSONRoundTrip(t *testing.T) {
 		Version:      "1.0.0",
 		ScanMode:     "tap",
 		MediaPlaying: true,
+		MediaReady:   true,
+		Hook: zapscript.ExprEnvHook{
+			Name:           "startup",
+			FirstBootStart: true,
+		},
 		Device: zapscript.ExprEnvDevice{
 			Hostname: "testhost",
 			OS:       "linux",
@@ -115,6 +128,9 @@ func TestArgExprEnv_JSONRoundTrip(t *testing.T) {
 	assert.Equal(t, original.Version, decoded.Version)
 	assert.Equal(t, original.ScanMode, decoded.ScanMode)
 	assert.Equal(t, original.MediaPlaying, decoded.MediaPlaying)
+	assert.Equal(t, original.MediaReady, decoded.MediaReady)
+	assert.Equal(t, original.Hook.Name, decoded.Hook.Name)
+	assert.Equal(t, original.Hook.FirstBootStart, decoded.Hook.FirstBootStart)
 	assert.Equal(t, original.Device.Hostname, decoded.Device.Hostname)
 	assert.Equal(t, original.LastScanned.ID, decoded.LastScanned.ID)
 	assert.Equal(t, original.ActiveMedia.Path, decoded.ActiveMedia.Path)
@@ -156,6 +172,22 @@ func TestExprEnvLaunching_JSONSerialization(t *testing.T) {
 	assert.Contains(t, jsonStr, `"path"`)
 	assert.Contains(t, jsonStr, `"system_id"`)
 	assert.Contains(t, jsonStr, `"launcher_id"`)
+}
+
+func TestExprEnvHook_JSONSerialization(t *testing.T) {
+	t.Parallel()
+
+	hook := zapscript.ExprEnvHook{
+		Name:           "startup",
+		FirstBootStart: true,
+	}
+
+	jsonBytes, err := json.Marshal(hook)
+	require.NoError(t, err)
+
+	jsonStr := string(jsonBytes)
+	assert.Contains(t, jsonStr, `"name"`)
+	assert.Contains(t, jsonStr, `"first_boot_start"`)
 }
 
 // TestArgExprEnv_EmptyFieldsSerialization verifies that empty struct fields are serialized
