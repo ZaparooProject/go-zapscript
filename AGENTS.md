@@ -235,7 +235,7 @@ result, err := parser.EvalExpressions(envStruct)
 - **System**: `execute`, `delay`, `evaluate`, `stop`, `echo`
 - **MiSTer**: `mister.ini`, `mister.core`, `mister.script`, `mister.mgl`
 - **HTTP**: `http.get`, `http.post`
-- **Input**: `input.keyboard`, `input.gamepad`, `input.coinp1`, `input.coinp2`
+- **Input**: `input.keyboard`, `input.gamepad`, `input.coinp1`, `input.coinp2`, `input.coinp3`, `input.coinp4`
 - **UI**: `ui.notice`, `ui.picker`
 - **Metadata**: `traits` (parsed from `#key=value` syntax)
 
