@@ -35,6 +35,17 @@ func TestLaunchArgsSetNameAdvargFields(t *testing.T) {
 	requireAdvargField(t, reflect.TypeOf(LaunchLastArgs{}), "set_name_same_dir")
 }
 
+func TestSlotAdvargFields(t *testing.T) {
+	t.Parallel()
+
+	requireAdvargField(t, reflect.TypeOf(LaunchArgs{}), "slot")
+	requireAdvargField(t, reflect.TypeOf(LaunchRandomArgs{}), "slot")
+	requireAdvargField(t, reflect.TypeOf(LaunchSearchArgs{}), "slot")
+	requireAdvargField(t, reflect.TypeOf(LaunchTitleArgs{}), "slot")
+	requireAdvargField(t, reflect.TypeOf(LaunchLastArgs{}), "slot")
+	requireAdvargField(t, reflect.TypeOf(PlaylistArgs{}), "slot")
+}
+
 func requireAdvargField(t *testing.T, typ reflect.Type, tag string) {
 	t.Helper()
 
