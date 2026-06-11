@@ -43,3 +43,11 @@ func TestLaunchSetNameKeys(t *testing.T) {
 		t.Fatalf("KeySetNameSameDir = %q, want %q", KeySetNameSameDir, "set_name_same_dir")
 	}
 }
+
+func TestSlotKey(t *testing.T) {
+	t.Parallel()
+
+	if KeySlot != "slot" {
+		t.Fatalf("KeySlot = %q, want %q", KeySlot, "slot")
+	}
+}

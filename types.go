@@ -44,6 +44,7 @@ const (
 	KeyAction         Key = "action"
 	KeySetName        Key = "set_name"
 	KeySetNameSameDir Key = "set_name_same_dir"
+	KeySlot           Key = "slot"
 	KeyTags           Key = "tags"
 	KeyMode           Key = "mode"
 	KeyName           Key = "name"
@@ -84,6 +85,8 @@ type LaunchArgs struct {
 	System string `advarg:"system" validate:"omitempty,system"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
 	Action string `advarg:"action" validate:"omitempty,oneof=run details"`
+	// Slot selects the media slot for launch routing.
+	Slot string `advarg:"slot"`
 	// Name is the filename for remote file installation.
 	Name string `advarg:"name"`
 	// PreNotice is shown before remote file download.
@@ -101,6 +104,8 @@ type LaunchRandomArgs struct {
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
 	Action string `advarg:"action" validate:"omitempty,oneof=run details"`
+	// Slot selects the media slot for launch routing.
+	Slot string `advarg:"slot"`
 	// Tags filters results by tag criteria.
 	Tags []TagFilter `advarg:"tags"`
 }
@@ -116,6 +121,8 @@ type LaunchSearchArgs struct {
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
 	Action string `advarg:"action" validate:"omitempty,oneof=run details"`
+	// Slot selects the media slot for launch routing.
+	Slot string `advarg:"slot"`
 	// Tags filters results by tag criteria.
 	Tags []TagFilter `advarg:"tags"`
 }
@@ -131,6 +138,8 @@ type LaunchTitleArgs struct {
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
 	Action string `advarg:"action" validate:"omitempty,oneof=run details"`
+	// Slot selects the media slot for launch routing.
+	Slot string `advarg:"slot"`
 	// Tags filters results by tag criteria.
 	Tags []TagFilter `advarg:"tags"`
 }
@@ -146,6 +155,8 @@ type LaunchLastArgs struct {
 	Launcher string `advarg:"launcher" validate:"omitempty,launcher"` //nolint:revive // custom validator
 	// Action specifies the launch action (run, details).
 	Action string `advarg:"action" validate:"omitempty,oneof=run details"`
+	// Slot selects the media slot for launch routing.
+	Slot string `advarg:"slot"`
 }
 
 // PlaylistArgs contains advanced arguments for playlist commands.
@@ -153,6 +164,8 @@ type PlaylistArgs struct {
 	GlobalArgs
 	// Mode controls playlist behavior (e.g., "shuffle").
 	Mode string `advarg:"mode" validate:"omitempty,oneof=shuffle"`
+	// Slot selects the media slot for playlist routing.
+	Slot string `advarg:"slot"`
 }
 
 // MisterScriptArgs contains advanced arguments for MiSTer script commands.
