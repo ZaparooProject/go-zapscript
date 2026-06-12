@@ -47,6 +47,7 @@ const (
 	KeySlot           Key = "slot"
 	KeyTags           Key = "tags"
 	KeyMode           Key = "mode"
+	KeyRepeat         Key = "repeat"
 	KeyName           Key = "name"
 	KeyPreNotice      Key = "pre_notice"
 	KeyHidden         Key = "hidden"
@@ -64,6 +65,16 @@ const (
 const (
 	// ModeShuffle randomizes playlist order.
 	ModeShuffle = "shuffle"
+)
+
+// Repeat values for the repeat advanced argument.
+const (
+	// RepeatOff stops playback at the end of the playlist (default).
+	RepeatOff = "off"
+	// RepeatAll loops the whole playlist back to the start when it ends.
+	RepeatAll = "all"
+	// RepeatOne repeats the current track indefinitely.
+	RepeatOne = "one"
 )
 
 // GlobalArgs contains advanced arguments available to all commands.
@@ -164,6 +175,8 @@ type PlaylistArgs struct {
 	GlobalArgs
 	// Mode controls playlist behavior (e.g., "shuffle").
 	Mode string `advarg:"mode" validate:"omitempty,oneof=shuffle"`
+	// Repeat controls end-of-playlist behaviour: off (default), all (loop playlist), one (repeat track).
+	Repeat string `advarg:"repeat" validate:"omitempty,oneof=off all one"`
 	// Slot selects the media slot for playlist routing.
 	Slot string `advarg:"slot"`
 }

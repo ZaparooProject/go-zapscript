@@ -31,3 +31,13 @@ func IsActionRun(action string) bool {
 func IsModeShuffle(mode string) bool {
 	return strings.EqualFold(mode, ModeShuffle)
 }
+
+// IsRepeatAll returns true if the repeat value is "all" (case-insensitive).
+func IsRepeatAll(repeat string) bool {
+	return strings.EqualFold(repeat, RepeatAll)
+}
+
+// IsRepeatOne returns true if the repeat value is "one" (case-insensitive).
+func IsRepeatOne(repeat string) bool {
+	return strings.EqualFold(repeat, RepeatOne)
+}
