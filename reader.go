@@ -178,11 +178,18 @@ func (c Command) String() string {
 				}
 			}
 		case isInputRawCmd(normalizeCmdName(c.Name)):
-			// Raw text commands concatenate args directly with no escape processing.
-			// {enter}/{tab} are written literally and will reparse as individual chars —
-			// this is a known serialization limitation for the newline/tab mappings.
+			// Raw text: reverse the parseInputRawArg mappings so the output re-parses
+			// to the same args. {enter} → newline, {tab} → tab; all other args are
+			// single chars written as-is.
 			for _, arg := range c.Args {
-				_, _ = b.WriteString(arg)
+				switch arg {
+				case "{enter}":
+					_, _ = b.WriteRune('\n')
+				case "{tab}":
+					_, _ = b.WriteRune('\t')
+				default:
+					_, _ = b.WriteString(arg)
+				}
 			}
 		default:
 			for i, arg := range c.Args {

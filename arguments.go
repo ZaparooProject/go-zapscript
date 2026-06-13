@@ -137,6 +137,10 @@ macroLoop:
 			if exprErr != nil {
 				return args, advArgs, exprErr
 			}
+			totalLen++
+			if totalLen > InputMacroMaxKeys {
+				return args, advArgs, ErrInputMacroTooLong
+			}
 			args = append(args, exprValue)
 			continue
 		case SymAdvArgStart:
@@ -218,9 +222,6 @@ func expandInputMacroExt(content string, totalLen *int) ([]string, error) {
 		text, repeat, err := parseQuotedLiteralWithRepeat(content)
 		if err != nil {
 			return nil, err
-		}
-		if repeat > InputMacroMaxRepeat {
-			return nil, fmt.Errorf("%w: %d (max %d)", ErrInputMacroRepeatTooLarge, repeat, InputMacroMaxRepeat)
 		}
 		return expandLiteralChars(text, repeat, totalLen)
 	}

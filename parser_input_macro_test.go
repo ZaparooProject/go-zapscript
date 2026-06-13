@@ -16,428 +16,484 @@
 package zapscript_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	zapscript "github.com/ZaparooProject/go-zapscript"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
 )
 
-// parseInputMacroArgs is a test helper that parses **input.keyboard:<macro> and
-// returns the Args slice so tests can assert on expanded tokens directly.
-func parseInputMacroArgs(t *testing.T, macro string) []string {
-	t.Helper()
-	p := zapscript.NewParser("**input.keyboard:" + macro)
-	script, err := p.ParseScript()
-	require.NoError(t, err)
-	require.Len(t, script.Cmds, 1)
-	return script.Cmds[0].Args
+// kbd builds the expected Script for a single **input.keyboard command.
+func kbd(args ...string) zapscript.Script {
+	return zapscript.Script{Cmds: []zapscript.Command{{Name: "input.keyboard", Args: args}}}
 }
 
-// parseInputTextArgs is a test helper for **input.text:<raw>.
-func parseInputTextArgs(t *testing.T, raw string) []string {
-	t.Helper()
-	p := zapscript.NewParser("**input.text:" + raw)
-	script, err := p.ParseScript()
-	require.NoError(t, err)
-	require.Len(t, script.Cmds, 1)
-	return script.Cmds[0].Args
+// txt builds the expected Script for a single **input.text command.
+func txt(args ...string) zapscript.Script {
+	return zapscript.Script{Cmds: []zapscript.Command{{Name: "input.text", Args: args}}}
 }
 
-// ─── Backward-compatibility ──────────────────────────────────────────────────
+// diffOpts is the cmp option used consistently with parser_coverage_test.go.
+var diffOpts = cmp.AllowUnexported(zapscript.AdvArgs{})
 
-func TestInputMacro_BackwardCompat_BareChars(t *testing.T) {
+// ─── Regression test for issue #939 ──────────────────────────────────────────
+
+// TestInputMacro_Issue939_LeadingSpace confirms that the leading space in
+// " *MENU" is preserved as a literal arg — the original bug produced only
+// "*" because the shift-toggling corrupted the sequence on MiSTer.
+func TestInputMacro_Issue939_LeadingSpace(t *testing.T) {
 	t.Parallel()
-	// "hello" outside braces: each char is its own arg (unchanged behaviour)
-	got := parseInputMacroArgs(t, "hello")
-	assert.Equal(t, []string{"h", "e", "l", "l", "o"}, got)
+	p := zapscript.NewParser("**input.keyboard: *MENU")
+	got, err := p.ParseScript()
+	if err != nil {
+		t.Fatalf("ParseScript() unexpected error: %v", err)
+	}
+	want := kbd(" ", "*", "M", "E", "N", "U")
+	if diff := cmp.Diff(want, got, diffOpts); diff != "" {
+		t.Errorf("ParseScript() mismatch (-want +got):\n%s", diff)
+	}
 }
 
-func TestInputMacro_BackwardCompat_Space(t *testing.T) {
+// TestInputMacro_EscapeAtEOF verifies that a trailing backslash at end of
+// input is appended as a literal backslash, not silently dropped.
+func TestInputMacro_EscapeAtEOF(t *testing.T) {
 	t.Parallel()
-	// Spaces are literal (issue #939 context: " *MENU" keeps the leading space)
-	got := parseInputMacroArgs(t, " *MENU")
-	assert.Equal(t, []string{" ", "*", "M", "E", "N", "U"}, got)
+	p := zapscript.NewParser(`**input.keyboard:hello\`)
+	got, err := p.ParseScript()
+	if err != nil {
+		t.Fatalf("ParseScript() unexpected error: %v", err)
+	}
+	want := kbd("h", "e", "l", "l", "o", `\`)
+	if diff := cmp.Diff(want, got, diffOpts); diff != "" {
+		t.Errorf("ParseScript() mismatch (-want +got):\n%s", diff)
+	}
 }
 
-func TestInputMacro_BackwardCompat_BracedSpecial(t *testing.T) {
+// ─── New grammar: repeat, single-char brace, specials ────────────────────────
+
+func TestInputMacroGrammar(t *testing.T) {
 	t.Parallel()
-	got := parseInputMacroArgs(t, "{enter}")
-	assert.Equal(t, []string{"{enter}"}, got)
-}
+	tests := []struct {
+		wantErr error
+		name    string
+		input   string
+		want    zapscript.Script
+	}{
+		// Single-char brace expands without braces; multi-char keeps braces.
+		{
+			name:  "braced single char expands to bare char",
+			input: "**input.keyboard:{a}",
+			want:  kbd("a"),
+		},
+		{
+			name:  "braced special keeps braces",
+			input: "**input.keyboard:{f1}",
+			want:  kbd("{f1}"),
+		},
+		{
+			name:  "braced combo keeps braces",
+			input: "**input.keyboard:{ctrl+c}",
+			want:  kbd("{ctrl+c}"),
+		},
+		// Repeat *N.
+		{
+			name:  "single char repeated 5 times",
+			input: "**input.keyboard:{a*5}",
+			want:  kbd("a", "a", "a", "a", "a"),
+		},
+		{
+			name:  "special key repeated 3 times",
+			input: "**input.keyboard:{enter*3}",
+			want:  kbd("{enter}", "{enter}", "{enter}"),
+		},
+		{
+			name:  "combo repeated 3 times",
+			input: "**input.keyboard:{ctrl+c*3}",
+			want:  kbd("{ctrl+c}", "{ctrl+c}", "{ctrl+c}"),
+		},
+		{
+			name:  "repeat of 1 is a no-op",
+			input: "**input.keyboard:{a*1}",
+			want:  kbd("a"),
+		},
+		{
+			name:  "asterisk after non-integer is literal",
+			input: "**input.keyboard:{a*b}",
+			want:  kbd("{a*b}"),
+		},
+		{
+			name:  "repeat in mixed sequence",
+			input: "**input.keyboard:a{enter*2}b",
+			want:  kbd("a", "{enter}", "{enter}", "b"),
+		},
+		// Quoted literal {"text"[*N]}.
+		{
+			name:  "quoted literal basic",
+			input: `**input.keyboard:{"hello"}`,
+			want:  kbd("h", "e", "l", "l", "o"),
+		},
+		{
+			name:  "quoted literal with repeat",
+			input: `**input.keyboard:{"hi"*3}`,
+			want:  kbd("h", "i", "h", "i", "h", "i"),
+		},
+		{
+			name:  "quoted literal empty produces no tokens",
+			input: `**input.keyboard:{""}`,
+			want:  kbd(),
+		},
+		{
+			name:  "quoted literal asterisk is literal char",
+			input: `**input.keyboard:{"a*b"}`,
+			want:  kbd("a", "*", "b"),
+		},
+		{
+			name:  "quoted literal plus is literal char",
+			input: `**input.keyboard:{"a+b"}`,
+			want:  kbd("a", "+", "b"),
+		},
+		{
+			name:  "quoted literal escaped quote",
+			input: `**input.keyboard:{"say \"hi\""}`,
+			want:  kbd("s", "a", "y", " ", `"`, "h", "i", `"`),
+		},
+		{
+			name:  "asterisk typed via quoted literal",
+			input: `**input.keyboard:{"*"*5}`,
+			want:  kbd("*", "*", "*", "*", "*"),
+		},
+		// text: verb — equivalent to quoted literal.
+		{
+			name:  "text verb basic",
+			input: "**input.keyboard:{text:hi}",
+			want:  kbd("h", "i"),
+		},
+		{
+			name:  "text verb with repeat",
+			input: "**input.keyboard:{text:ab*3}",
+			want:  kbd("a", "b", "a", "b", "a", "b"),
+		},
+		{
+			name:  "text verb asterisk followed by non-integer is literal",
+			input: "**input.keyboard:{text:a*b}",
+			want:  kbd("a", "*", "b"),
+		},
+		{
+			name:  "quoted and text verb are equivalent",
+			input: `**input.keyboard:{"hello"*2}`,
+			want:  kbd("h", "e", "l", "l", "o", "h", "e", "l", "l", "o"),
+		},
+		// delay pass-through.
+		{
+			name:  "delay integer ms passes through",
+			input: "**input.keyboard:{delay:500}",
+			want:  kbd("{delay:500}"),
+		},
+		{
+			name:  "delay human duration passes through",
+			input: "**input.keyboard:{delay:1s}",
+			want:  kbd("{delay:1s}"),
+		},
+		{
+			name:  "delay in sequence",
+			input: "**input.keyboard:a{delay:100}b",
+			want:  kbd("a", "{delay:100}", "b"),
+		},
+		// Hold verbs and sigils.
+		{
+			name:  "press verb passes through",
+			input: "**input.keyboard:{press:a}",
+			want:  kbd("{press:a}"),
+		},
+		{
+			name:  "release verb passes through",
+			input: "**input.keyboard:{release:a}",
+			want:  kbd("{release:a}"),
+		},
+		{
+			name:  "hold verb passes through",
+			input: "**input.keyboard:{hold:a:500}",
+			want:  kbd("{hold:a:500}"),
+		},
+		{
+			name:  "press sigil passes through",
+			input: "**input.keyboard:{_a}",
+			want:  kbd("{_a}"),
+		},
+		{
+			name:  "release sigil passes through",
+			input: "**input.keyboard:{^a}",
+			want:  kbd("{^a}"),
+		},
+		{
+			name:  "hold sigil passes through",
+			input: "**input.keyboard:{~a:500}",
+			want:  kbd("{~a:500}"),
+		},
+		{
+			name:  "hold-while sequence",
+			input: "**input.keyboard:{_right}bbb{^right}",
+			want:  kbd("{_right}", "b", "b", "b", "{^right}"),
+		},
+		// Command chaining: macro ends at ||.
+		{
+			name:  "command terminator ends macro",
+			input: "**input.keyboard:ab||**stop",
+			want: zapscript.Script{Cmds: []zapscript.Command{
+				{Name: "input.keyboard", Args: []string{"a", "b"}},
+				{Name: "stop"},
+			}},
+		},
+	}
 
-func TestInputMacro_BackwardCompat_Combo(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{ctrl+c}")
-	assert.Equal(t, []string{"{ctrl+c}"}, got)
-}
-
-func TestInputMacro_BackwardCompat_EscapeSeq(t *testing.T) {
-	t.Parallel()
-	// \\ before a char escapes it
-	got := parseInputMacroArgs(t, `\{`)
-	assert.Equal(t, []string{"{"}, got)
-}
-
-func TestInputMacro_BackwardCompat_AdvArgs(t *testing.T) {
-	t.Parallel()
-	p := zapscript.NewParser("**input.keyboard:ab?speed=50")
-	script, err := p.ParseScript()
-	require.NoError(t, err)
-	require.Len(t, script.Cmds, 1)
-	cmd := script.Cmds[0]
-	assert.Equal(t, []string{"a", "b"}, cmd.Args)
-	assert.Equal(t, "50", cmd.AdvArgs.Get("speed"))
-}
-
-// ─── Single-key brace form ────────────────────────────────────────────────────
-
-func TestInputMacro_BracedSingleChar(t *testing.T) {
-	t.Parallel()
-	// {a} expands to "a" — single-char token without braces
-	got := parseInputMacroArgs(t, "{a}")
-	assert.Equal(t, []string{"a"}, got)
-}
-
-func TestInputMacro_BracedSpecialNoRepeat(t *testing.T) {
-	t.Parallel()
-	// {f1} passes through with braces (multi-char name)
-	got := parseInputMacroArgs(t, "{f1}")
-	assert.Equal(t, []string{"{f1}"}, got)
-}
-
-// ─── Repeat: key *N ──────────────────────────────────────────────────────────
-
-func TestInputMacro_Repeat_SingleChar(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{a*5}")
-	assert.Equal(t, []string{"a", "a", "a", "a", "a"}, got)
-}
-
-func TestInputMacro_Repeat_Special(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{enter*3}")
-	assert.Equal(t, []string{"{enter}", "{enter}", "{enter}"}, got)
-}
-
-func TestInputMacro_Repeat_Combo(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{ctrl+c*3}")
-	assert.Equal(t, []string{"{ctrl+c}", "{ctrl+c}", "{ctrl+c}"}, got)
-}
-
-func TestInputMacro_Repeat_One(t *testing.T) {
-	t.Parallel()
-	// *1 is valid and equals no repeat
-	got := parseInputMacroArgs(t, "{a*1}")
-	assert.Equal(t, []string{"a"}, got)
-}
-
-func TestInputMacro_Repeat_AsteriskViaQuote(t *testing.T) {
-	t.Parallel()
-	// Correct way to type 5 asterisks
-	got := parseInputMacroArgs(t, `{"*"*5}`)
-	assert.Equal(t, []string{"*", "*", "*", "*", "*"}, got)
-}
-
-func TestInputMacro_Repeat_InMixedSequence(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "a{enter*2}b")
-	assert.Equal(t, []string{"a", "{enter}", "{enter}", "b"}, got)
-}
-
-// ─── Quoted literal ───────────────────────────────────────────────────────────
-
-func TestInputMacro_QuotedLiteral_Basic(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, `{"hello"}`)
-	assert.Equal(t, []string{"h", "e", "l", "l", "o"}, got)
-}
-
-func TestInputMacro_QuotedLiteral_WithRepeat(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, `{"hi"*3}`)
-	assert.Equal(t, []string{"h", "i", "h", "i", "h", "i"}, got)
-}
-
-func TestInputMacro_QuotedLiteral_EscapedQuote(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, `{"say \"hi\""}`)
-	assert.Equal(t, []string{"s", "a", "y", " ", `"`, "h", "i", `"`}, got)
-}
-
-func TestInputMacro_QuotedLiteral_AsteriskIsLiteral(t *testing.T) {
-	t.Parallel()
-	// Inside quotes, * is a literal character to type
-	got := parseInputMacroArgs(t, `{"a*b"}`)
-	assert.Equal(t, []string{"a", "*", "b"}, got)
-}
-
-func TestInputMacro_QuotedLiteral_PlusIsLiteral(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, `{"a+b"}`)
-	assert.Equal(t, []string{"a", "+", "b"}, got)
-}
-
-func TestInputMacro_QuotedLiteral_Empty(t *testing.T) {
-	t.Parallel()
-	// {""}  — empty quoted literal produces no tokens
-	got := parseInputMacroArgs(t, `{""}`)
-	assert.Empty(t, got)
-}
-
-// ─── text: verb ───────────────────────────────────────────────────────────────
-
-func TestInputMacro_TextVerb_Basic(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{text:hi}")
-	assert.Equal(t, []string{"h", "i"}, got)
-}
-
-func TestInputMacro_TextVerb_WithRepeat(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{text:ab*3}")
-	assert.Equal(t, []string{"a", "b", "a", "b", "a", "b"}, got)
-}
-
-func TestInputMacro_TextVerb_AsteriskInContent(t *testing.T) {
-	t.Parallel()
-	// {text:a*b} — *b is not a valid repeat (b is not a number) so * is literal
-	got := parseInputMacroArgs(t, "{text:a*b}")
-	assert.Equal(t, []string{"a", "*", "b"}, got)
-}
-
-func TestInputMacro_QuotedAndTextVerbAreEquivalent(t *testing.T) {
-	t.Parallel()
-	quote := parseInputMacroArgs(t, `{"hello"*2}`)
-	verb := parseInputMacroArgs(t, "{text:hello*2}")
-	assert.Equal(t, quote, verb)
-}
-
-// ─── delay: pass-through ─────────────────────────────────────────────────────
-
-func TestInputMacro_Delay_PassThrough(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{delay:500}")
-	assert.Equal(t, []string{"{delay:500}"}, got)
-}
-
-func TestInputMacro_Delay_HumanDuration(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{delay:1s}")
-	assert.Equal(t, []string{"{delay:1s}"}, got)
-}
-
-func TestInputMacro_Delay_InSequence(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "a{delay:100}b")
-	assert.Equal(t, []string{"a", "{delay:100}", "b"}, got)
-}
-
-// ─── Hold verbs and sigils ────────────────────────────────────────────────────
-
-func TestInputMacro_HoldVerb_Press(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{press:a}")
-	assert.Equal(t, []string{"{press:a}"}, got)
-}
-
-func TestInputMacro_HoldVerb_Release(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{release:a}")
-	assert.Equal(t, []string{"{release:a}"}, got)
-}
-
-func TestInputMacro_HoldVerb_Hold(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{hold:a:500}")
-	assert.Equal(t, []string{"{hold:a:500}"}, got)
-}
-
-func TestInputMacro_Sigil_Down(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{_a}")
-	assert.Equal(t, []string{"{_a}"}, got)
-}
-
-func TestInputMacro_Sigil_Up(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{^a}")
-	assert.Equal(t, []string{"{^a}"}, got)
-}
-
-func TestInputMacro_Sigil_Hold(t *testing.T) {
-	t.Parallel()
-	got := parseInputMacroArgs(t, "{~a:500}")
-	assert.Equal(t, []string{"{~a:500}"}, got)
-}
-
-func TestInputMacro_HoldWhile_Sequence(t *testing.T) {
-	t.Parallel()
-	// {_right}bbb{^right} — hold right, tap b three times, release right
-	got := parseInputMacroArgs(t, "{_right}bbb{^right}")
-	assert.Equal(t, []string{"{_right}", "b", "b", "b", "{^right}"}, got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := zapscript.NewParser(tt.input)
+			got, err := p.ParseScript()
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("ParseScript() error = %v, wantErr = %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr != nil {
+				return
+			}
+			if diff := cmp.Diff(tt.want, got, diffOpts); diff != "" {
+				t.Errorf("ParseScript() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
 
 // ─── Safety caps ─────────────────────────────────────────────────────────────
 
-func TestInputMacro_RepeatCap(t *testing.T) {
+func TestInputMacroCaps(t *testing.T) {
 	t.Parallel()
-	// *1001 exceeds InputMacroMaxRepeat (1000)
-	p := zapscript.NewParser("**input.keyboard:{a*1001}")
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrInputMacroRepeatTooLarge, "want ErrInputMacroRepeatTooLarge, got: %v", err)
+	// wantErr: specific exported error checked with errors.Is.
+	// wantAnyErr: true when an error is expected but is an unexported fmt.Errorf.
+	tests := []struct {
+		wantErr    error
+		name       string
+		input      string
+		wantAnyErr bool
+	}{
+		// Per-repeat cap.
+		{
+			name:    "key repeat exceeds cap",
+			input:   "**input.keyboard:{a*1001}",
+			wantErr: zapscript.ErrInputMacroRepeatTooLarge,
+		},
+		{
+			name:    "quoted literal repeat exceeds cap",
+			input:   `**input.keyboard:{"a"*1001}`,
+			wantErr: zapscript.ErrInputMacroRepeatTooLarge,
+		},
+		// Quoted literal parse errors.
+		{
+			name:    "single opening quote only",
+			input:   `**input.keyboard:{"}`,
+			wantErr: zapscript.ErrUnmatchedQuote,
+		},
+		{
+			name:       "trailing non-asterisk after closing quote",
+			input:      `**input.keyboard:{"hello"x}`,
+			wantAnyErr: true,
+		},
+		{
+			name:       "zero repeat in quoted literal",
+			input:      `**input.keyboard:{"hello"*0}`,
+			wantAnyErr: true,
+		},
+		{
+			name:       "non-numeric repeat in quoted literal",
+			input:      `**input.keyboard:{"hello"*abc}`,
+			wantAnyErr: true,
+		},
+		// Total keys cap.
+		{
+			name:    "total keys exceeded via key repeats",
+			input:   "**input.keyboard:" + strings.Repeat("{a*1000}", 6),
+			wantErr: zapscript.ErrInputMacroTooLong,
+		},
+		{
+			name:    "total keys exceeded via bare chars",
+			input:   "**input.keyboard:" + strings.Repeat("a", 5001),
+			wantErr: zapscript.ErrInputMacroTooLong,
+		},
+		{
+			name:    "total keys exceeded via pass-through token after full cap",
+			input:   "**input.keyboard:" + strings.Repeat("{a*1000}", 5) + "{delay:1}",
+			wantErr: zapscript.ErrInputMacroTooLong,
+		},
+		{
+			name:    "total keys exceeded via sigil token after full cap",
+			input:   "**input.keyboard:" + strings.Repeat("{a*1000}", 5) + "{_shift}",
+			wantErr: zapscript.ErrInputMacroTooLong,
+		},
+		{
+			name:    "total keys exceeded via literal expansion after full cap",
+			input:   "**input.keyboard:" + strings.Repeat("{a*1000}", 5) + `{"b"}`,
+			wantErr: zapscript.ErrInputMacroTooLong,
+		},
+		// Other error cases.
+		{
+			name:    "empty braces",
+			input:   "**input.keyboard:{}",
+			wantErr: zapscript.ErrUnmatchedInputMacroExt,
+		},
+		{
+			name:    "empty key after repeat suffix removal",
+			input:   "**input.keyboard:{*5}",
+			wantErr: zapscript.ErrInputMacroEmptyKey,
+		},
+		{
+			name:    "unclosed quoted literal at EOF",
+			input:   `**input.keyboard:{"unclosed`,
+			wantErr: zapscript.ErrUnmatchedInputMacroExt,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := zapscript.NewParser(tt.input)
+			_, err := p.ParseScript()
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Errorf("ParseScript() error = %v, wantErr = %v", err, tt.wantErr)
+			}
+			if tt.wantAnyErr && err == nil {
+				t.Error("ParseScript() expected an error, got nil")
+			}
+		})
+	}
 }
 
+// TestInputMacro_RepeatAtMax verifies that exactly 1000 tokens are produced at
+// the cap boundary (not an error).
 func TestInputMacro_RepeatAtMax(t *testing.T) {
 	t.Parallel()
-	// *1000 is exactly at the cap — should succeed
 	p := zapscript.NewParser("**input.keyboard:{a*1000}")
 	script, err := p.ParseScript()
-	require.NoError(t, err)
-	assert.Len(t, script.Cmds[0].Args, 1000)
+	if err != nil {
+		t.Fatalf("ParseScript() unexpected error: %v", err)
+	}
+	if got := len(script.Cmds[0].Args); got != 1000 {
+		t.Errorf("len(Args) = %d, want 1000", got)
+	}
 }
 
-func TestInputMacro_TotalKeysCap(t *testing.T) {
-	t.Parallel()
-	// 6 reps × 1000 = 6000 > InputMacroMaxKeys (5000)
-	p := zapscript.NewParser("**input.keyboard:{a*1000}{b*1000}{c*1000}{d*1000}{e*1000}{f*1000}")
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrInputMacroTooLong, "want ErrInputMacroTooLong, got: %v", err)
-}
-
+// TestInputMacro_TotalKeysAtMax verifies that exactly 5000 tokens are accepted
+// without error.
 func TestInputMacro_TotalKeysAtMax(t *testing.T) {
 	t.Parallel()
-	// 5 × 1000 = 5000 exactly at the cap — should succeed
-	p := zapscript.NewParser("**input.keyboard:{a*1000}{b*1000}{c*1000}{d*1000}{e*1000}")
+	p := zapscript.NewParser("**input.keyboard:" + strings.Repeat("{a*1000}", 5))
 	script, err := p.ParseScript()
-	require.NoError(t, err)
-	assert.Len(t, script.Cmds[0].Args, 5000)
-}
-
-func TestInputMacro_LiteralCharsCap(t *testing.T) {
-	t.Parallel()
-	// Plain chars outside braces also count toward the total
-	// 5001 'a' chars should exceed the cap
-	p := zapscript.NewParser("**input.keyboard:" + strings.Repeat("a", 5001))
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrInputMacroTooLong)
+	if err != nil {
+		t.Fatalf("ParseScript() unexpected error: %v", err)
+	}
+	if got := len(script.Cmds[0].Args); got != 5000 {
+		t.Errorf("len(Args) = %d, want 5000", got)
+	}
 }
 
 // ─── input.text raw mode ─────────────────────────────────────────────────────
 
-func TestInputText_Basic(t *testing.T) {
+func TestInputTextGrammar(t *testing.T) {
 	t.Parallel()
-	got := parseInputTextArgs(t, "hello")
-	assert.Equal(t, []string{"h", "e", "l", "l", "o"}, got)
-}
+	tests := []struct {
+		wantErr error
+		name    string
+		input   string
+		want    zapscript.Script
+	}{
+		{
+			name:  "bare text produces individual char args",
+			input: "**input.text:hello",
+			want:  txt("h", "e", "l", "l", "o"),
+		},
+		{
+			name:  "braces are literal chars",
+			input: "**input.text:{enter}",
+			want:  txt("{", "e", "n", "t", "e", "r", "}"),
+		},
+		{
+			name:  "asterisk is a literal char",
+			input: "**input.text:a*5",
+			want:  txt("a", "*", "5"),
+		},
+		{
+			name:  "question mark is literal — no adv-arg parsing",
+			input: "**input.text:what?",
+			want:  txt("w", "h", "a", "t", "?"),
+		},
+		{
+			name:  "full URL is literal",
+			input: "**input.text:https://x.com?q=foo",
+			want: func() zapscript.Script {
+				chars := make([]string, 0, len("https://x.com?q=foo"))
+				for _, r := range "https://x.com?q=foo" {
+					chars = append(chars, string(r))
+				}
+				return txt(chars...)
+			}(),
+		},
+		{
+			name:  "newline maps to {enter}",
+			input: "**input.text:a\nb",
+			want:  txt("a", "{enter}", "b"),
+		},
+		{
+			name:  "tab maps to {tab}",
+			input: "**input.text:a\tb",
+			want:  txt("a", "{tab}", "b"),
+		},
+		{
+			name:  "empty arg produces no tokens",
+			input: "**input.text:",
+			want:  txt(),
+		},
+		{
+			name:  "speed arg is typed literally",
+			input: "**input.text:hello?speed=50",
+			want: func() zapscript.Script {
+				chars := make([]string, 0, len("hello?speed=50"))
+				for _, r := range "hello?speed=50" {
+					chars = append(chars, string(r))
+				}
+				return txt(chars...)
+			}(),
+		},
+		{
+			name:  "command terminator ends raw text",
+			input: "**input.text:hello||**stop",
+			want: zapscript.Script{Cmds: []zapscript.Command{
+				{Name: "input.text", Args: []string{"h", "e", "l", "l", "o"}},
+				{Name: "stop"},
+			}},
+		},
+		{
+			name:    "total keys cap enforced in raw mode",
+			input:   "**input.text:" + strings.Repeat("a", 5001),
+			wantErr: zapscript.ErrInputMacroTooLong,
+		},
+	}
 
-func TestInputText_BracesAreLiteral(t *testing.T) {
-	t.Parallel()
-	// {} syntax is NOT interpreted in input.text
-	got := parseInputTextArgs(t, "{enter}")
-	assert.Equal(t, []string{"{", "e", "n", "t", "e", "r", "}"}, got)
-}
-
-func TestInputText_AsteriskIsLiteral(t *testing.T) {
-	t.Parallel()
-	got := parseInputTextArgs(t, "a*5")
-	assert.Equal(t, []string{"a", "*", "5"}, got)
-}
-
-func TestInputText_QuestionMarkIsLiteral(t *testing.T) {
-	t.Parallel()
-	// ? is NOT parsed as adv-arg start in raw mode
-	got := parseInputTextArgs(t, "what?")
-	assert.Equal(t, []string{"w", "h", "a", "t", "?"}, got)
-}
-
-func TestInputText_URLIsLiteral(t *testing.T) {
-	t.Parallel()
-	// A URL with ? should type literally, not trigger adv-arg parsing
-	got := parseInputTextArgs(t, "https://x.com/search?q=foo")
-	require.Len(t, got, 26)
-	// spot-check the ? character
-	assert.Equal(t, "?", got[20])
-}
-
-func TestInputText_NewlineMapsToEnter(t *testing.T) {
-	t.Parallel()
-	got := parseInputTextArgs(t, "a\nb")
-	assert.Equal(t, []string{"a", "{enter}", "b"}, got)
-}
-
-func TestInputText_TabMapsToTab(t *testing.T) {
-	t.Parallel()
-	got := parseInputTextArgs(t, "a\tb")
-	assert.Equal(t, []string{"a", "{tab}", "b"}, got)
-}
-
-func TestInputText_NoAdvArgs(t *testing.T) {
-	t.Parallel()
-	// input.text has no adv-args; a trailing ? is typed literally
-	p := zapscript.NewParser("**input.text:hello?speed=50")
-	script, err := p.ParseScript()
-	require.NoError(t, err)
-	cmd := script.Cmds[0]
-	// All chars including ? s p e e d = 5 0 are args
-	assert.Contains(t, cmd.Args, "?")
-	assert.Empty(t, cmd.AdvArgs.Get("speed"))
-}
-
-func TestInputText_CapEnforced(t *testing.T) {
-	t.Parallel()
-	p := zapscript.NewParser("**input.text:" + strings.Repeat("a", 5001))
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrInputMacroTooLong)
-}
-
-func TestInputText_EmptyArg(t *testing.T) {
-	t.Parallel()
-	p := zapscript.NewParser("**input.text:")
-	script, err := p.ParseScript()
-	require.NoError(t, err)
-	assert.Empty(t, script.Cmds[0].Args)
-}
-
-// ─── Error cases ─────────────────────────────────────────────────────────────
-
-func TestInputMacro_EmptyBraces(t *testing.T) {
-	t.Parallel()
-	p := zapscript.NewParser("**input.keyboard:{}")
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrUnmatchedInputMacroExt)
-}
-
-func TestInputMacro_UnclosedBrace(t *testing.T) {
-	t.Parallel()
-	p := zapscript.NewParser("**input.keyboard:{enter")
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrUnmatchedInputMacroExt)
-}
-
-func TestInputMacro_UnclosedQuotedLiteral(t *testing.T) {
-	t.Parallel()
-	// {"unclosed — EOF reached inside brace content before closing }
-	// parseInputMacroExtContent returns ErrUnmatchedInputMacroExt on EOF
-	p := zapscript.NewParser(`**input.keyboard:{"unclosed`)
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrUnmatchedInputMacroExt)
-}
-
-func TestInputMacro_EmptyKeyAfterRepeat(t *testing.T) {
-	t.Parallel()
-	// {*5} — content "*5" → name="" after removing *5 → ErrInputMacroEmptyKey
-	p := zapscript.NewParser("**input.keyboard:{*5}")
-	_, err := p.ParseScript()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, zapscript.ErrInputMacroEmptyKey)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := zapscript.NewParser(tt.input)
+			got, err := p.ParseScript()
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("ParseScript() error = %v, wantErr = %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr != nil {
+				return
+			}
+			if diff := cmp.Diff(tt.want, got, diffOpts); diff != "" {
+				t.Errorf("ParseScript() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
