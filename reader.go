@@ -155,7 +155,8 @@ func (c Command) String() string {
 	if len(c.Args) > 0 {
 		_, _ = b.WriteRune(SymArgStart)
 
-		if isInputMacroCmd(normalizeCmdName(c.Name)) {
+		switch {
+		case isInputMacroCmd(normalizeCmdName(c.Name)):
 			// Input macro commands concatenate args directly
 			for _, arg := range c.Args {
 				if len(arg) > 1 && rune(arg[0]) == SymInputMacroExtStart &&
@@ -176,7 +177,14 @@ func (c Command) String() string {
 					}
 				}
 			}
-		} else {
+		case isInputRawCmd(normalizeCmdName(c.Name)):
+			// Raw text commands concatenate args directly with no escape processing.
+			// {enter}/{tab} are written literally and will reparse as individual chars —
+			// this is a known serialization limitation for the newline/tab mappings.
+			for _, arg := range c.Args {
+				_, _ = b.WriteString(arg)
+			}
+		default:
 			for i, arg := range c.Args {
 				if i > 0 {
 					_, _ = b.WriteRune(SymArgSep)
