@@ -64,6 +64,9 @@ const (
 
 	ZapScriptCmdTraits = "traits"
 
+	ZapScriptCmdProfileSwitch = "profile.switch"
+	ZapScriptCmdProfileClear  = "profile.clear"
+
 	ZapScriptCmdInputKey = "input.key" // DEPRECATED
 	ZapScriptCmdKey      = "key"       // DEPRECATED
 	ZapScriptCmdCoinP1   = "coinp1"    // DEPRECATED
