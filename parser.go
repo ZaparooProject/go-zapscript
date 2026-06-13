@@ -151,12 +151,18 @@ commandLoop:
 			var advArgs map[string]string
 			var err error
 
-			if isInputMacroCmd(cmd.Name) {
+			switch {
+			case isInputMacroCmd(cmd.Name):
 				args, advArgs, err = sr.parseInputMacroArg()
 				if err != nil {
 					return cmd, string(buf), err
 				}
-			} else {
+			case isInputRawCmd(cmd.Name):
+				args, err = sr.parseInputRawArg()
+				if err != nil {
+					return cmd, string(buf), err
+				}
+			default:
 				args, advArgs, err = sr.parseArgs("", onlyAdvArgs, onlyOneArg)
 				if err != nil {
 					return cmd, string(buf), err

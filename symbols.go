@@ -33,6 +33,18 @@ var (
 	ErrBadExpressionReturn    = errors.New("expression return type not supported")
 	ErrInvalidTraitKey        = errors.New("invalid trait key")
 	ErrUnmatchedArrayBracket  = errors.New("unmatched array bracket")
+
+	// Input macro expansion errors.
+	ErrInputMacroRepeatTooLarge = errors.New("input macro repeat count exceeds maximum")
+	ErrInputMacroTooLong        = errors.New("input macro expanded key count exceeds maximum")
+	ErrInputMacroEmptyKey       = errors.New("input macro key name is empty after repeat suffix removal")
+)
+
+const (
+	// InputMacroMaxRepeat is the maximum value for a single *N repeat expression.
+	InputMacroMaxRepeat = 1000
+	// InputMacroMaxKeys is the maximum total number of expanded key tokens per macro.
+	InputMacroMaxKeys = 5000
 )
 
 const (
@@ -97,4 +109,11 @@ func isInputMacroCmd(name string) bool {
 	default:
 		return false
 	}
+}
+
+// isInputRawCmd reports whether name is a raw-text input command. Raw commands
+// treat their entire argument as literal text to type; no {} grammar or * repeat
+// syntax is interpreted, and no adv-args are supported.
+func isInputRawCmd(name string) bool {
+	return name == ZapScriptCmdInputText
 }

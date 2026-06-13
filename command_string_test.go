@@ -112,6 +112,16 @@ func TestCommandString(t *testing.T) {
 			want: "**input.gamepad:^^VV<>",
 		},
 		{
+			name: "input.text raw",
+			cmd:  zapscript.Command{Name: "input.text", Args: []string{"h", "i", " ", "t", "h", "e", "r", "e"}},
+			want: "**input.text:hi there",
+		},
+		{
+			name: "input.text with url",
+			cmd:  zapscript.Command{Name: "input.text", Args: []string{"x", "?", "y", "=", "1"}},
+			want: "**input.text:x?y=1",
+		},
+		{
 			name: "arg with double quote",
 			cmd:  zapscript.Command{Name: "echo", Args: []string{`say "hi"`}},
 			want: `**echo:"say ^"hi^""`,
@@ -186,6 +196,8 @@ func TestCommandString_RoundTrip(t *testing.T) {
 		"**launch:game.exe?platform=win",
 		"**input.keyboard:abc{f1}{enter}",
 		"**input.gamepad:^^VV<><>",
+		"**input.text:hello world",
+		"**input.text:url?q=foo",
 		"**delay:500",
 		"**launch.random:SNES",
 		"**http.get:https://example.com/api",

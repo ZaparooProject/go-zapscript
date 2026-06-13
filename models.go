@@ -54,6 +54,7 @@ const (
 
 	ZapScriptCmdInputKeyboard = "input.keyboard"
 	ZapScriptCmdInputGamepad  = "input.gamepad"
+	ZapScriptCmdInputText     = "input.text"
 	ZapScriptCmdInputCoinP1   = "input.coinp1"
 	ZapScriptCmdInputCoinP2   = "input.coinp2"
 	ZapScriptCmdInputCoinP3   = "input.coinp3"

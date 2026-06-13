@@ -31,6 +31,19 @@ func FuzzParseScript(f *testing.F) {
 		`**delay:1000`,
 		`**launch.title:snes/Super Mario World`,
 		`**cmd:arg1,arg2,arg3?key=value&other=thing`,
+		// Input macro — new grammar seeds
+		`**input.keyboard:{a*5}`,
+		`**input.keyboard:{"hello"*2}`,
+		`**input.keyboard:{text:world*3}`,
+		`**input.keyboard:{delay:100}`,
+		`**input.keyboard:{_shift}ABC{^shift}`,
+		`**input.keyboard:{~enter:200}`,
+		`**input.keyboard:{hold:a:1s}`,
+		`**input.text:raw text with spaces`,
+		`**input.text:url?with=query`,
+		`**input.keyboard:{a*1001}`,
+		`**input.keyboard:{}`,
+		`**input.keyboard:{*5}`,
 		// Chained commands
 		`**launch:game||**delay:500||**notify:done`,
 		// Generic launch (no ** prefix)
@@ -247,10 +260,28 @@ func FuzzCommandString(f *testing.F) {
 		// Quoted args
 		`**cmd:"quoted arg"`,
 		`**cmd:'single quotes'`,
-		// Input macro commands
+		// Input macro commands — basic
 		`**input.keyboard:abc`,
 		`**input.gamepad:abxy`,
 		`**input.keyboard:a{enter}b`,
+		// Input macro commands — new grammar
+		`**input.keyboard:{a*5}`,
+		`**input.keyboard:{enter*3}`,
+		`**input.keyboard:{ctrl+c*3}`,
+		`**input.keyboard:{"hello"}`,
+		`**input.keyboard:{"hi"*2}`,
+		`**input.keyboard:{text:hi*3}`,
+		`**input.keyboard:{delay:500}`,
+		`**input.keyboard:{press:a}`,
+		`**input.keyboard:{release:a}`,
+		`**input.keyboard:{hold:a:500}`,
+		`**input.keyboard:{_shift}abc{^shift}`,
+		`**input.keyboard:{~a:200}`,
+		`**input.keyboard:a{delay:100}b?speed=50`,
+		`**input.text:hello world`,
+		`**input.text:https://example.com/search?q=foo`,
+		`**input.text:{"not parsed"}`,
+		`**input.text:{enter*5}`,
 		// No args
 		`**stop`,
 		// Expressions (these won't round-trip but shouldn't panic)
