@@ -22,6 +22,35 @@ import (
 	"strings"
 )
 
+// mergeJSONTraits merges the decoded members of a **traits object into dst.
+//
+// Keys are normalized so a trait means the same thing however it was written,
+// which lets two distinct JSON keys land on one trait. There is no member
+// order left to break the tie by: JSON arguments are normalized through a map
+// before they reach here, so a collision would otherwise be settled by Go's
+// randomized map iteration and the same script could parse two ways. A
+// contradictory object drops the trait instead of picking a winner.
+func mergeJSONTraits(dst, src map[string]any) {
+	normalized := make(map[string]int, len(src))
+	for key := range src {
+		if ValidateTraitKey(key) != nil {
+			continue
+		}
+		normalized[NormalizeTraitKey(key)]++
+	}
+
+	for key, value := range src {
+		if ValidateTraitKey(key) != nil {
+			continue
+		}
+		normalizedKey := NormalizeTraitKey(key)
+		if normalized[normalizedKey] > 1 {
+			continue
+		}
+		dst[normalizedKey] = value
+	}
+}
+
 func (sr *ScriptReader) parseMediaTitleSyntax() (*mediaTitleParseResult, error) {
 	result := &mediaTitleParseResult{
 		advArgs: make(map[string]string),
@@ -335,12 +364,7 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 						if script.Traits == nil {
 							script.Traits = make(map[string]any)
 						}
-						for k, v := range traitsData {
-							if ValidateTraitKey(k) != nil {
-								continue
-							}
-							script.Traits[NormalizeTraitKey(k)] = v
-						}
+						mergeJSONTraits(script.Traits, traitsData)
 						continue
 					}
 				}
