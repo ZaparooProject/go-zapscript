@@ -90,6 +90,9 @@ func isCmdName(ch rune) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '.'
 }
 
+// isAdvArgName and isAdvArgNameStart define the shared grammar for advanced
+// argument names and trait keys. ValidateTraitKey is the exported, whole-string
+// form for callers holding a key the parser never read.
 func isAdvArgName(ch rune) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'
 }

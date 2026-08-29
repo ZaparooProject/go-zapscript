@@ -324,7 +324,11 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 			case err != nil:
 				return script, parseErr(err)
 			default:
-				// Handle **traits command by merging into script.Traits
+				// Handle **traits command by merging into script.Traits.
+				// Keys go through the same grammar and lowercasing the inline
+				// #key syntax applies, so both spellings of a trait produce the
+				// same map key and a key the inline form rejects is dropped
+				// here too.
 				if cmd.Name == ZapScriptCmdTraits && len(cmd.Args) > 0 {
 					var traitsData map[string]any
 					if jsonErr := json.Unmarshal([]byte(cmd.Args[0]), &traitsData); jsonErr == nil {
@@ -332,7 +336,10 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 							script.Traits = make(map[string]any)
 						}
 						for k, v := range traitsData {
-							script.Traits[k] = v
+							if ValidateTraitKey(k) != nil {
+								continue
+							}
+							script.Traits[NormalizeTraitKey(k)] = v
 						}
 						continue
 					}
