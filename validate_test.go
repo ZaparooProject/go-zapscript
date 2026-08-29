@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/ZaparooProject/go-zapscript"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateTraitKeyValid(t *testing.T) {
@@ -249,6 +251,131 @@ func TestParseTraitsJSONKeysNormalized(t *testing.T) {
 						tt.input, key, got, got, want, want)
 				}
 			}
+		})
+	}
+}
+
+// Two JSON keys differing only in case normalize to one trait. Merging them
+// through a map let Go's randomized iteration order pick the winner, so the
+// same script parsed to different results run to run.
+func TestParseTraitsJSONKeyCollisionIsDeterministic(t *testing.T) {
+	t.Parallel()
+
+	inputs := []string{
+		`**traits:{"Tap":true,"tap":false,"TAP":"last"}||**echo:hi`,
+		`**traits:{"Hold":true,"hold":false}||**echo:hi`,
+		`**traits:{"Keep":1,"kept":2}`,
+	}
+
+	for _, input := range inputs {
+		t.Run(input, func(t *testing.T) {
+			t.Parallel()
+
+			first, err := zapscript.NewParser(input).ParseScript()
+			require.NoError(t, err)
+
+			for range 200 {
+				got, parseErr := zapscript.NewParser(input).ParseScript()
+				require.NoError(t, parseErr)
+				require.Equal(t, first.Traits, got.Traits, "same input parsed to different traits")
+			}
+		})
+	}
+}
+
+// JSON arguments are normalized through a map before the traits merge sees
+// them, so there is no member order to resolve a collision by. A contradictory
+// object drops the trait rather than picking a winner.
+func TestParseTraitsJSONKeyCollisionDropsTrait(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		wantTraits map[string]any
+		name       string
+		input      string
+	}{
+		{
+			name:       "collision drops only the contested trait",
+			input:      `**traits:{"Tap":true,"tap":false,"hold":true}`,
+			wantTraits: map[string]any{"hold": true},
+		},
+		{
+			name:       "collision on every key leaves no traits",
+			input:      `**traits:{"Tap":true,"tap":false}||**echo:hi`,
+			wantTraits: map[string]any{},
+		},
+		{
+			name:       "three way collision drops the trait",
+			input:      `**traits:{"TAP":1,"Tap":2,"tap":3,"hold":true}`,
+			wantTraits: map[string]any{"hold": true},
+		},
+		{
+			name:       "unique keys are unaffected",
+			input:      `**traits:{"Tap":true,"Hold":false}`,
+			wantTraits: map[string]any{"tap": true, "hold": false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			script, err := zapscript.NewParser(tt.input).ParseScript()
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantTraits, script.Traits)
+		})
+	}
+}
+
+func TestParseTraitsJSONDecoding(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		wantTraits map[string]any
+		name       string
+		input      string
+		wantCmds   int
+	}{
+		{
+			name:       "null is consumed and adds nothing",
+			input:      `**traits:null||**echo:hi`,
+			wantCmds:   1,
+			wantTraits: map[string]any{},
+		},
+		{
+			name:       "empty object adds nothing",
+			input:      `**traits:{}||**echo:hi`,
+			wantCmds:   1,
+			wantTraits: map[string]any{},
+		},
+		{
+			name:     "values keep their inferred types",
+			input:    `**traits:{"name":"mario","level":5,"flag":true,"items":["a"]}`,
+			wantCmds: 0,
+			wantTraits: map[string]any{
+				"name": "mario", "level": float64(5), "flag": true, "items": []any{"a"},
+			},
+		},
+		{
+			name:       "non object json stays a command",
+			input:      `**traits:[1,2]||**echo:hi`,
+			wantCmds:   2,
+			wantTraits: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			script, err := zapscript.NewParser(tt.input).ParseScript()
+			require.NoError(t, err)
+			assert.Len(t, script.Cmds, tt.wantCmds)
+			if tt.wantTraits == nil {
+				assert.Empty(t, script.Traits)
+				return
+			}
+			assert.Equal(t, tt.wantTraits, script.Traits)
 		})
 	}
 }
