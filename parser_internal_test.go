@@ -309,3 +309,34 @@ func TestIsWhitespace(t *testing.T) {
 		})
 	}
 }
+
+// ValidateTraitKey is the exported form of the grammar the parser applies rune
+// by rune. This sweep fails if the two ever disagree, which is the whole point
+// of building one on the other.
+func TestValidateTraitKeyMatchesRunePredicates(t *testing.T) {
+	t.Parallel()
+
+	runes := make([]rune, 0, 128+4)
+	for r := rune(0); r < 128; r++ {
+		runes = append(runes, r)
+	}
+	runes = append(runes, 'é', 'ß', '中', '🎮')
+
+	for _, r := range runes {
+		if r == 0 {
+			continue // NUL is not meaningful as a key character
+		}
+
+		wantStart := isAdvArgNameStart(r)
+		gotStart := ValidateTraitKey(string(r)) == nil
+		if gotStart != wantStart {
+			t.Errorf("ValidateTraitKey(%q) valid = %v, isAdvArgNameStart = %v", r, gotStart, wantStart)
+		}
+
+		wantRest := isAdvArgName(r)
+		gotRest := ValidateTraitKey("a"+string(r)) == nil
+		if gotRest != wantRest {
+			t.Errorf("ValidateTraitKey(%q) valid = %v, isAdvArgName = %v", "a"+string(r), gotRest, wantRest)
+		}
+	}
+}

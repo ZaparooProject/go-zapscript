@@ -224,6 +224,12 @@ result, err := parser.ParseExpressions("text with [[expr]]")
 
 // Evaluate expressions with environment
 result, err := parser.EvalExpressions(envStruct)
+
+// Check a trait key that did not come from the parser
+err := zapscript.ValidateTraitKey(key)
+
+// Match a plain-string key against a parsed Script's traits
+value, ok := script.Traits[zapscript.NormalizeTraitKey(key)]
 ```
 
 ## Supported Commands
