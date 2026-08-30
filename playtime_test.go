@@ -16,12 +16,15 @@
 package zapscript_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/ZaparooProject/go-zapscript"
 	"github.com/google/go-cmp/cmp"
 )
 
+// TestParsePlaytimeExtend covers both amount forms the command accepts, plus
+// the argument combinations a written card is likely to carry.
 func TestParsePlaytimeExtend(t *testing.T) {
 	t.Parallel()
 
@@ -104,6 +107,9 @@ func TestParsePlaytimeExtend(t *testing.T) {
 	}
 }
 
+// TestPlaytimeExtendRoundTrip checks a parsed command survives String() and
+// reparsing unchanged, so tooling that rewrites a card cannot alter the
+// amount or drop the authorizing profile.
 func TestPlaytimeExtendRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -138,18 +144,26 @@ func TestPlaytimeExtendRoundTrip(t *testing.T) {
 	}
 }
 
-// TestPlaytimeExtendArgs checks the advanced argument tag matches the key
-// constant, so the two cannot drift apart.
-func TestPlaytimeExtendArgs(t *testing.T) {
+// TestPlaytimeExtendArgsContract pins the parts of PlaytimeExtendArgs that
+// consumers bind against. This library only declares the tags; the decoding
+// lives in the consumer, so a tag that stops matching its key constant would
+// otherwise fail silently and far from here.
+func TestPlaytimeExtendArgsContract(t *testing.T) {
 	t.Parallel()
 
-	cmd := zapscript.Command{
-		Name:    zapscript.ZapScriptCmdPlaytimeExtend,
-		Args:    []string{"15m"},
-		AdvArgs: zapscript.NewAdvArgs(map[string]string{string(zapscript.KeyProfile): "abc123"}),
+	argsType := reflect.TypeOf(zapscript.PlaytimeExtendArgs{})
+
+	profile, ok := argsType.FieldByName("Profile")
+	if !ok {
+		t.Fatal("PlaytimeExtendArgs.Profile is missing")
+	}
+	if got, want := profile.Tag.Get("advarg"), string(zapscript.KeyProfile); got != want {
+		t.Errorf("Profile advarg tag = %q, want %q", got, want)
 	}
 
-	if got := cmd.AdvArgs.Get(zapscript.KeyProfile); got != "abc123" {
-		t.Errorf("AdvArgs.Get(KeyProfile) = %q, want %q", got, "abc123")
+	// GlobalArgs has to stay embedded or the global when argument silently
+	// stops reaching the command.
+	if _, ok := argsType.FieldByName("When"); !ok {
+		t.Error("PlaytimeExtendArgs does not embed GlobalArgs")
 	}
 }
