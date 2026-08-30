@@ -51,6 +51,15 @@ const (
 	KeyName           Key = "name"
 	KeyPreNotice      Key = "pre_notice"
 	KeyHidden         Key = "hidden"
+	KeyProfile        Key = "profile"
+)
+
+// Playtime extension amounts for the playtime.extend command.
+const (
+	// PlaytimeExtendToday waives the session limit for the rest of the
+	// local day instead of adding a fixed amount of time. Any other value
+	// is a Go duration.
+	PlaytimeExtendToday = "today"
 )
 
 // Action values for the action advanced argument.
@@ -186,4 +195,14 @@ type MisterScriptArgs struct {
 	GlobalArgs
 	// Hidden controls whether the script window is hidden.
 	Hidden string `advarg:"hidden"`
+}
+
+// PlaytimeExtendArgs contains advanced arguments for the playtime.extend
+// command.
+type PlaytimeExtendArgs struct {
+	GlobalArgs
+	// Profile is the switch ID authorizing the extension, the same value
+	// the profile command takes. It names who permits the grant, not who
+	// receives it.
+	Profile string `advarg:"profile"`
 }

@@ -68,6 +68,8 @@ const (
 	ZapScriptCmdProfile      = "profile"
 	ZapScriptCmdProfileClear = "profile.clear"
 
+	ZapScriptCmdPlaytimeExtend = "playtime.extend"
+
 	ZapScriptCmdInputKey = "input.key" // DEPRECATED
 	ZapScriptCmdKey      = "key"       // DEPRECATED
 	ZapScriptCmdCoinP1   = "coinp1"    // DEPRECATED
