@@ -123,6 +123,16 @@ func TestInputMacroGrammar(t *testing.T) {
 			want:  kbd("{a*b}"),
 		},
 		{
+			name:  "trailing asterisk in combo is literal",
+			input: "**input.keyboard:{ctrl+*}",
+			want:  kbd("{ctrl+*}"),
+		},
+		{
+			name:  "asterisk before zero is literal",
+			input: "**input.keyboard:{a*0}",
+			want:  kbd("{a*0}"),
+		},
+		{
 			name:  "repeat in mixed sequence",
 			input: "**input.keyboard:a{enter*2}b",
 			want:  kbd("a", "{enter}", "{enter}", "b"),
@@ -346,6 +356,16 @@ func TestInputMacroCaps(t *testing.T) {
 			name:    "empty key after repeat suffix removal",
 			input:   "**input.keyboard:{*5}",
 			wantErr: zapscript.ErrInputMacroEmptyKey,
+		},
+		{
+			name:    "key name left with a repeat suffix",
+			input:   "**input.keyboard:{a*1*2}",
+			wantErr: zapscript.ErrInputMacroAmbiguousKey,
+		},
+		{
+			name:    "repeat suffix only key name",
+			input:   "**input.keyboard:{*1*1}",
+			wantErr: zapscript.ErrInputMacroAmbiguousKey,
 		},
 		{
 			name:    "unclosed quoted literal at EOF",

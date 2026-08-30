@@ -38,6 +38,7 @@ var (
 	ErrInputMacroRepeatTooLarge = errors.New("input macro repeat count exceeds maximum")
 	ErrInputMacroTooLong        = errors.New("input macro expanded key count exceeds maximum")
 	ErrInputMacroEmptyKey       = errors.New("input macro key name is empty after repeat suffix removal")
+	ErrInputMacroAmbiguousKey   = errors.New("input macro key name ends in a repeat suffix")
 )
 
 const (
