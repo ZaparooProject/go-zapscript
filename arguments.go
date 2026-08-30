@@ -268,6 +268,12 @@ func expandInputMacroExt(content string, totalLen *int) ([]string, error) {
 	if name == "" {
 		return nil, ErrInputMacroEmptyKey
 	}
+	// A name that still ends in a repeat suffix (e.g. "{a*1*2}" leaves "a*1")
+	// cannot be written back as "{name}": re-reading would strip the suffix a
+	// second time and yield a different macro. Reject the ambiguous form.
+	if stripped, _, stripErr := parseSuffixRepeat(name); stripErr != nil || stripped != name {
+		return nil, ErrInputMacroAmbiguousKey
+	}
 
 	// Single-rune keys are appended without braces (e.g. "a", "*").
 	// Multi-rune names need braces so ParseKeyCombo recognises them.
