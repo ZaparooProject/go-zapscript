@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	zapscript "github.com/ZaparooProject/go-zapscript"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,19 +71,35 @@ func TestParseScript_LongInputDoesNotAllocatePerCharacter(t *testing.T) {
 }
 
 // A long argument has to survive the parse intact, not merely parse quickly.
+// Multibyte and escaped content is covered too: the reader decodes runes from
+// the input in place, so a rune that spans several bytes exercises the offset
+// arithmetic that replaced the buffered reader.
 func TestParseScript_LongArgumentRoundTrips(t *testing.T) {
 	t.Parallel()
 
-	arg := strings.Repeat("A", 16384)
+	const reps = 4096
+	ascii := strings.Repeat("A", 16384)
+	multibyte := strings.Repeat("\u3042", reps)
 
 	tests := []struct {
 		name   string
 		script string
 		want   string
 	}{
-		{name: "positional arg", script: "**launch:" + arg, want: arg},
-		{name: "quoted arg", script: `**launch:"` + arg + `"`, want: arg},
-		{name: "auto launch content", script: arg, want: arg},
+		{name: "positional arg", script: "**launch:" + ascii, want: ascii},
+		{name: "quoted arg", script: `**launch:"` + ascii + `"`, want: ascii},
+		{name: "auto launch content", script: ascii, want: ascii},
+		{name: "multibyte positional arg", script: "**launch:" + multibyte, want: multibyte},
+		{
+			name:   "multibyte quoted arg",
+			script: `**launch:"` + multibyte + `"`,
+			want:   multibyte,
+		},
+		{
+			name:   "escape sequences",
+			script: "**launch:" + strings.Repeat("a^nb", reps),
+			want:   strings.Repeat("a\nb", reps),
+		},
 	}
 
 	for _, tt := range tests {
@@ -93,7 +110,9 @@ func TestParseScript_LongArgumentRoundTrips(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, script.Cmds, 1)
 			require.Len(t, script.Cmds[0].Args, 1)
-			assert.Equal(t, tt.want, script.Cmds[0].Args[0])
+			if diff := cmp.Diff(tt.want, script.Cmds[0].Args[0]); diff != "" {
+				t.Errorf("argument mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -108,5 +127,78 @@ func TestParseScript_LongAdvArgRoundTrips(t *testing.T) {
 	script, err := zapscript.NewParser("**launch:game?name=" + value).ParseScript()
 	require.NoError(t, err)
 	require.Len(t, script.Cmds, 1)
-	assert.Equal(t, value, script.Cmds[0].AdvArgs.Get("name"))
+	if diff := cmp.Diff(value, script.Cmds[0].AdvArgs.Get("name")); diff != "" {
+		t.Errorf("advanced argument mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// The command name and the media title each accumulate through their own
+// builder, so neither is covered by the argument round trips above.
+func TestParseScript_LongCommandNameRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	name := strings.Repeat("a", 16384)
+
+	script, err := zapscript.NewParser("**" + name + ":arg").ParseScript()
+	require.NoError(t, err)
+	require.Len(t, script.Cmds, 1)
+	if diff := cmp.Diff(name, script.Cmds[0].Name); diff != "" {
+		t.Errorf("command name mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestParseScript_LongMediaTitleRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		title string
+	}{
+		{name: "ascii", title: strings.Repeat("A", 16384)},
+		{name: "multibyte", title: strings.Repeat("\u3042", 4096)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			script, err := zapscript.NewParser("@system/" + tt.title).ParseScript()
+			require.NoError(t, err)
+			require.Len(t, script.Cmds, 1)
+			require.Len(t, script.Cmds[0].Args, 1)
+			if diff := cmp.Diff("system/"+tt.title, script.Cmds[0].Args[0]); diff != "" {
+				t.Errorf("media title mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// peek reports invalid encoding as a rune error. A U+FFFD actually present in
+// the input is ordinary content and must not be mistaken for one, which it
+// was before: the parser only peeks after a command separator, an expression
+// terminator or a command prefix, so this reached a caller as a parse error.
+func TestParseScript_LiteralReplacementCharacterIsContent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		script string
+		want   string
+	}{
+		{name: "after a command separator", script: "**launch:a|\ufffd", want: "a|\ufffd"},
+		{name: "as the whole argument", script: "**launch:\ufffd", want: "\ufffd"},
+		{name: "mid argument", script: "**launch:a\ufffdb", want: "a\ufffdb"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			script, err := zapscript.NewParser(tt.script).ParseScript()
+			require.NoError(t, err)
+			require.Len(t, script.Cmds, 1)
+			require.Len(t, script.Cmds[0].Args, 1)
+			assert.Equal(t, tt.want, script.Cmds[0].Args[0])
+		})
+	}
 }
