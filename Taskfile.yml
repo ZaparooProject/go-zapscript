@@ -16,6 +16,14 @@ tasks:
     cmds:
       - go test -race ./...
 
+  bench:
+    desc: Run benchmarks (use BENCH to filter, COUNT to repeat)
+    vars:
+      BENCH: '{{default "." .BENCH}}'
+      COUNT: '{{default "1" .COUNT}}'
+    cmds:
+      - go test -run='^$' -bench='{{.BENCH}}' -benchmem -count={{.COUNT}} ./...
+
   fuzz:
     desc: Run fuzz tests (default 30s per test, use FUZZ_TIME to override)
     vars:
