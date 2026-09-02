@@ -329,8 +329,11 @@ func (sr *ScriptReader) peek() (rune, error) {
 	if sr.off >= len(sr.src) {
 		return eof, nil
 	}
-	r, _ := utf8.DecodeRuneInString(sr.src[sr.off:])
-	if r == utf8.RuneError {
+	r, width := utf8.DecodeRuneInString(sr.src[sr.off:])
+	// DecodeRuneInString reports invalid encoding as U+FFFD with a width of
+	// one. A U+FFFD that was actually written in the input decodes to the
+	// same rune but is three bytes wide, and is ordinary content.
+	if r == utf8.RuneError && width <= 1 {
 		return r, errRuneError
 	}
 	return r, nil
