@@ -16,12 +16,9 @@
 package zapscript
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -258,49 +255,88 @@ type mediaTitleParseResult struct {
 	valid      bool
 }
 
+var (
+	errUnreadNotPossible = errors.New("no rune available to unread")
+	errRuneError         = errors.New("rune error")
+)
+
+// ScriptReader walks the input one rune at a time, forward only.
+//
+// The input is held as the caller's string and decoded in place. Reading
+// through a buffer would copy the whole script and allocate a buffer for
+// every parser, which is dead weight for input that is already in memory and
+// is measurable when a caller parses the same short script several times.
 type ScriptReader struct {
-	r   *bufio.Reader
+	src string
+	// off is the byte offset of the next rune to read.
+	off int
+	// lastWidth is the byte width of the rune returned by the most recent
+	// read, or 0 when there is nothing to unread.
+	lastWidth int
+	// pos counts runes consumed. Argument parsing compares it against a
+	// saved position to tell whether a quote or brace opened an argument, so
+	// it counts runes rather than bytes.
 	pos int64
 }
 
 func NewParser(value string) *ScriptReader {
-	return &ScriptReader{
-		r: bufio.NewReader(bytes.NewReader([]byte(value))),
-	}
+	return &ScriptReader{src: value}
 }
 
 func (sr *ScriptReader) read() (rune, error) {
-	ch, _, err := sr.r.ReadRune()
-	if errors.Is(err, io.EOF) {
+	if sr.off >= len(sr.src) {
+		sr.lastWidth = 0
 		return eof, nil
-	} else if err != nil {
-		return eof, fmt.Errorf("failed to read rune: %w", err)
 	}
+	ch, width := utf8.DecodeRuneInString(sr.src[sr.off:])
+	sr.off += width
+	sr.lastWidth = width
 	sr.pos++
 	return ch, nil
 }
 
+// unread steps back over the rune returned by the most recent read. Only that
+// rune can be returned: a second unread, or one after a peek or at end of
+// input, is a bug in the caller rather than a condition to recover from.
 func (sr *ScriptReader) unread() error {
-	err := sr.r.UnreadRune()
-	if err != nil {
-		return fmt.Errorf("failed to unread rune: %w", err)
+	if sr.lastWidth == 0 {
+		return errUnreadNotPossible
 	}
+	sr.off -= sr.lastWidth
+	sr.lastWidth = 0
 	sr.pos--
 	return nil
 }
 
+// remaining returns the text the reader has not consumed yet. It is a slice
+// of the original input, not a copy.
+func (sr *ScriptReader) remaining() string {
+	return sr.src[sr.off:]
+}
+
+// consumeAll advances the reader to the end of the input, for the fast paths
+// that return the remaining text verbatim instead of walking it.
+func (sr *ScriptReader) consumeAll() {
+	sr.pos += int64(utf8.RuneCountInString(sr.remaining()))
+	sr.off = len(sr.src)
+	sr.lastWidth = 0
+}
+
 func (sr *ScriptReader) peek() (rune, error) {
-	for peekBytes := 4; peekBytes > 0; peekBytes-- {
-		b, err := sr.r.Peek(peekBytes)
-		if err == nil {
-			r, _ := utf8.DecodeRune(b)
-			if r == utf8.RuneError {
-				return r, errors.New("rune error")
-			}
-			return r, nil
-		}
+	// A peek invalidates the pending unread, matching the buffered reader
+	// this replaced, so a caller cannot start relying on the two composing.
+	sr.lastWidth = 0
+	if sr.off >= len(sr.src) {
+		return eof, nil
 	}
-	return eof, nil
+	r, width := utf8.DecodeRuneInString(sr.src[sr.off:])
+	// DecodeRuneInString reports invalid encoding as U+FFFD with a width of
+	// one. A U+FFFD that was actually written in the input decodes to the
+	// same rune but is three bytes wide, and is ordinary content.
+	if r == utf8.RuneError && width <= 1 {
+		return r, errRuneError
+	}
+	return r, nil
 }
 
 func (sr *ScriptReader) skip() error {
@@ -361,29 +397,29 @@ func (sr *ScriptReader) parseEscapeSeq() (string, error) {
 }
 
 func (sr *ScriptReader) parseQuotedArg(start rune) (string, error) {
-	arg := ""
+	var arg strings.Builder
 
 	for {
 		ch, err := sr.read()
 		if err != nil {
-			return arg, err
+			return arg.String(), err
 		} else if ch == eof {
-			return arg, ErrUnmatchedQuote
+			return arg.String(), ErrUnmatchedQuote
 		}
 
 		if ch == SymEscapeSeq {
 			next, err := sr.parseEscapeSeq()
 			if err != nil {
-				return arg, err
+				return arg.String(), err
 			}
-			arg += next
+			_, _ = arg.WriteString(next)
 			continue
 		} else if ch == SymExpressionStart {
 			exprValue, err := sr.parseExpression()
 			if err != nil {
-				return arg, err
+				return arg.String(), err
 			}
-			arg += exprValue
+			_, _ = arg.WriteString(exprValue)
 			continue
 		}
 
@@ -391,8 +427,8 @@ func (sr *ScriptReader) parseQuotedArg(start rune) (string, error) {
 			break
 		}
 
-		arg += string(ch)
+		_, _ = arg.WriteRune(ch)
 	}
 
-	return arg, nil
+	return arg.String(), nil
 }

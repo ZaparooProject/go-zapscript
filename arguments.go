@@ -428,18 +428,19 @@ func expandTokenN(token string, n int, totalLen *int) ([]string, error) {
 func (sr *ScriptReader) parseAdvArgs() (advArgs map[string]string, remainingStr string, err error) {
 	advArgs = make(map[string]string)
 	inValue := false
-	currentArg := ""
-	currentValue := ""
+	// Builders for the same reason as parseArgs: an advanced argument value
+	// can be as long as the rest of the command, and rune-at-a-time string
+	// concatenation makes that quadratic.
+	var currentArg, currentValue strings.Builder
 	valueStart := int64(-1)
 	buf := make([]rune, 0, 64)
 
 	storeArg := func() {
-		if currentArg != "" {
-			currentValue = strings.TrimSpace(currentValue)
-			advArgs[currentArg] = currentValue
+		if currentArg.Len() > 0 {
+			advArgs[currentArg.String()] = strings.TrimSpace(currentValue.String())
 		}
-		currentArg = ""
-		currentValue = ""
+		currentArg.Reset()
+		currentValue.Reset()
 	}
 
 	for {
@@ -459,14 +460,16 @@ func (sr *ScriptReader) parseAdvArgs() (advArgs map[string]string, remainingStr 
 				if parseErr != nil {
 					return advArgs, string(buf), parseErr
 				}
-				currentValue = quotedValue
+				currentValue.Reset()
+				_, _ = currentValue.WriteString(quotedValue)
 				continue
 			case ch == SymJSONStart && valueStart == sr.pos-1:
 				jsonValue, parseErr := sr.parseJSONArg()
 				if parseErr != nil {
 					return advArgs, string(buf), parseErr
 				}
-				currentValue = jsonValue
+				currentValue.Reset()
+				_, _ = currentValue.WriteString(jsonValue)
 				continue
 			case ch == SymEscapeSeq:
 				// Peek next char for raw tracking before parseEscapeSeq consumes it
@@ -479,11 +482,11 @@ func (sr *ScriptReader) parseAdvArgs() (advArgs map[string]string, remainingStr 
 				if escapeErr != nil {
 					return advArgs, string(buf), escapeErr
 				} else if next == "" {
-					currentValue += string(SymEscapeSeq)
+					_, _ = currentValue.WriteRune(SymEscapeSeq)
 					continue
 				}
 				buf = append(buf, nextRaw)
-				currentValue += next
+				_, _ = currentValue.WriteString(next)
 				continue
 			}
 		}
@@ -512,15 +515,15 @@ func (sr *ScriptReader) parseAdvArgs() (advArgs map[string]string, remainingStr 
 				if err != nil {
 					return advArgs, string(buf), err
 				}
-				currentValue += exprValue
+				_, _ = currentValue.WriteString(exprValue)
 			} else {
-				currentValue += string(ch)
+				_, _ = currentValue.WriteRune(ch)
 			}
 			continue
 		case !isAdvArgName(ch):
 			return advArgs, string(buf), ErrInvalidAdvArgName
 		default:
-			currentArg += string(ch)
+			_, _ = currentArg.WriteRune(ch)
 		}
 	}
 
@@ -536,7 +539,12 @@ func (sr *ScriptReader) parseArgs(
 ) (args []string, advArgs map[string]string, err error) {
 	args = make([]string, 0)
 	advArgs = make(map[string]string)
-	currentArg := prefix
+	// currentArg accumulates through a Builder rather than string
+	// concatenation: appending a rune at a time to a string reallocates and
+	// copies the whole argument on every character, which is quadratic in
+	// the length of the argument.
+	var currentArg strings.Builder
+	_, _ = currentArg.WriteString(prefix)
 	argStart := sr.pos
 	// tracks whether content was explicitly written, distinguishing
 	// "**cmd:" (no content, no arg) from "**cmd:''" (explicit empty arg)
@@ -557,7 +565,9 @@ argsLoop:
 			if quotedErr != nil {
 				return args, advArgs, quotedErr
 			}
-			currentArg = quotedArg
+			// a quoted argument replaces whatever preceded it
+			currentArg.Reset()
+			_, _ = currentArg.WriteString(quotedArg)
 			argWritten = true
 			continue argsLoop
 		case argStart == sr.pos-1 && ch == SymJSONStart:
@@ -565,7 +575,8 @@ argsLoop:
 			if jsonErr != nil {
 				return args, advArgs, jsonErr
 			}
-			currentArg = jsonArg
+			currentArg.Reset()
+			_, _ = currentArg.WriteString(jsonArg)
 			argWritten = true
 			continue argsLoop
 		case ch == SymEscapeSeq:
@@ -574,11 +585,11 @@ argsLoop:
 			if escapeErr != nil {
 				return args, advArgs, escapeErr
 			} else if next == "" {
-				currentArg += string(SymEscapeSeq)
+				_, _ = currentArg.WriteRune(SymEscapeSeq)
 				argWritten = true
 				continue argsLoop
 			}
-			currentArg += next
+			_, _ = currentArg.WriteString(next)
 			argWritten = true
 			continue argsLoop
 		}
@@ -593,9 +604,8 @@ argsLoop:
 		switch {
 		case !onlyOneArg && ch == SymArgSep:
 			// new argument
-			currentArg = strings.TrimSpace(currentArg)
-			args = append(args, currentArg)
-			currentArg = ""
+			args = append(args, strings.TrimSpace(currentArg.String()))
+			currentArg.Reset()
 			argStart = sr.pos
 			argWritten = false
 			continue argsLoop
@@ -605,7 +615,8 @@ argsLoop:
 			case errors.Is(err, ErrInvalidAdvArgName):
 				// if an adv arg name is invalid, fallback on treating it
 				// as a positional arg with a ? in it
-				currentArg += string(SymAdvArgStart) + buf
+				_, _ = currentArg.WriteRune(SymAdvArgStart)
+				_, _ = currentArg.WriteString(buf)
 				continue argsLoop
 			case err != nil:
 				return args, advArgs, err
@@ -620,11 +631,11 @@ argsLoop:
 			if err != nil {
 				return args, advArgs, err
 			}
-			currentArg += exprValue
+			_, _ = currentArg.WriteString(exprValue)
 			argWritten = true
 			continue argsLoop
 		default:
-			currentArg += string(ch)
+			_, _ = currentArg.WriteRune(ch)
 			if !isWhitespace(ch) {
 				argWritten = true
 			}
@@ -632,12 +643,12 @@ argsLoop:
 		}
 	}
 
-	currentArg = strings.TrimSpace(currentArg)
-	if !onlyAdvArgs && (currentArg != "" || argWritten) {
-		args = append(args, currentArg)
-	} else if onlyAdvArgs && currentArg != "" {
+	finalArg := strings.TrimSpace(currentArg.String())
+	if !onlyAdvArgs && (finalArg != "" || argWritten) {
+		args = append(args, finalArg)
+	} else if onlyAdvArgs && finalArg != "" {
 		// fallback content from invalid adv args should still be preserved
-		args = append(args, currentArg)
+		args = append(args, finalArg)
 	}
 
 	return args, advArgs, nil

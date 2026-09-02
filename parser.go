@@ -106,7 +106,7 @@ func (sr *ScriptReader) parseMediaTitleSyntax() (*mediaTitleParseResult, error) 
 			break
 		}
 
-		_, _ = contentBuilder.WriteString(string(ch))
+		_, _ = contentBuilder.WriteRune(ch)
 	}
 	rawContent += contentBuilder.String()
 
@@ -136,6 +136,10 @@ func (sr *ScriptReader) parseMediaTitleSyntax() (*mediaTitleParseResult, error) 
 func (sr *ScriptReader) parseCommand(onlyOneArg bool) (Command, string, error) {
 	cmd := Command{}
 	var buf []rune
+	// A command name is short in practice, but nothing bounds it: the
+	// grammar accepts name characters until it meets a separator, so an
+	// unterminated name is as long as the input.
+	var name strings.Builder
 
 commandLoop:
 	for {
@@ -157,14 +161,14 @@ commandLoop:
 
 		switch {
 		case isCmdName(ch):
-			cmd.Name += string(ch)
+			_, _ = name.WriteRune(ch)
 		case ch == SymArgStart || ch == SymAdvArgStart:
 			// parse arguments
-			if cmd.Name == "" {
+			if name.Len() == 0 {
 				break commandLoop
 			}
 
-			cmd.Name = normalizeCmdName(cmd.Name)
+			cmd.Name = normalizeCmdName(name.String())
 
 			onlyAdvArgs := false
 			if ch == SymAdvArgStart {
@@ -214,10 +218,11 @@ commandLoop:
 	}
 
 	if cmd.Name == "" {
-		return cmd, string(buf), ErrEmptyCmdName
+		if name.Len() == 0 {
+			return cmd, string(buf), ErrEmptyCmdName
+		}
+		cmd.Name = normalizeCmdName(name.String())
 	}
-
-	cmd.Name = normalizeCmdName(cmd.Name)
 
 	return cmd, string(buf), nil
 }
