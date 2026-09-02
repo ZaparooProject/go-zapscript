@@ -98,15 +98,16 @@ type CustomLauncherExprEnv struct {
 }
 
 func (sr *ScriptReader) parseExpression() (string, error) {
-	rawExpr := TokExpStart
+	var rawExpr strings.Builder
+	_, _ = rawExpr.WriteString(TokExpStart)
 
 	next, err := sr.read()
 	if err != nil {
-		return rawExpr, err
+		return rawExpr.String(), err
 	} else if next != SymExpressionStart {
 		err := sr.unread()
 		if err != nil {
-			return rawExpr, err
+			return rawExpr.String(), err
 		}
 		return string(SymExpressionStart), nil
 	}
@@ -114,51 +115,51 @@ func (sr *ScriptReader) parseExpression() (string, error) {
 	for {
 		ch, err := sr.read()
 		if err != nil {
-			return rawExpr, err
+			return rawExpr.String(), err
 		} else if ch == eof {
-			return rawExpr, ErrUnmatchedExpression
+			return rawExpr.String(), ErrUnmatchedExpression
 		}
 
 		if ch == SymExpressionEnd {
 			next, err := sr.peek()
 			if err != nil {
-				return rawExpr, err
+				return rawExpr.String(), err
 			} else if next == SymExpressionEnd {
-				rawExpr += TokExprEnd
+				_, _ = rawExpr.WriteString(TokExprEnd)
 				err := sr.skip()
 				if err != nil {
-					return rawExpr, err
+					return rawExpr.String(), err
 				}
 				break
 			}
 		}
 
-		rawExpr += string(ch)
+		_, _ = rawExpr.WriteRune(ch)
 	}
 
-	return rawExpr, nil
+	return rawExpr.String(), nil
 }
 
 func (sr *ScriptReader) parsePostExpression() (string, error) {
-	rawExpr := ""
+	var rawExpr strings.Builder
 	exprEndToken, _ := utf8.DecodeRuneInString(TokExprEnd)
 
 	for {
 		ch, err := sr.read()
 		if err != nil {
-			return rawExpr, err
+			return rawExpr.String(), err
 		} else if ch == eof {
-			return rawExpr, ErrUnmatchedExpression
+			return rawExpr.String(), ErrUnmatchedExpression
 		}
 
 		if ch == exprEndToken {
 			break
 		}
 
-		rawExpr += string(ch)
+		_, _ = rawExpr.WriteRune(ch)
 	}
 
-	return rawExpr, nil
+	return rawExpr.String(), nil
 }
 
 // ParseExpressions parses and converts expressions in the input string from
@@ -166,12 +167,21 @@ func (sr *ScriptReader) parsePostExpression() (string, error) {
 // to be evaluated by the EvalExpressions function. This function ONLY parses
 // expression symbols and escape sequences, no other ZapScript syntax.
 func (sr *ScriptReader) ParseExpressions() (string, error) {
-	result := ""
+	// Without an escape sequence or an expression opener there is nothing to
+	// rewrite and the output is the input. Almost every argument on a launch
+	// path is in that shape, so it is worth not walking it twice.
+	if rest := sr.remaining(); !strings.ContainsRune(rest, SymEscapeSeq) &&
+		!strings.ContainsRune(rest, SymExpressionStart) {
+		sr.consumeAll()
+		return rest, nil
+	}
+
+	var result strings.Builder
 
 	for {
 		ch, err := sr.read()
 		if err != nil {
-			return result, err
+			return result.String(), err
 		} else if ch == eof {
 			break
 		}
@@ -180,31 +190,49 @@ func (sr *ScriptReader) ParseExpressions() (string, error) {
 		case SymEscapeSeq:
 			next, err := sr.parseEscapeSeq()
 			if err != nil {
-				return result, err
+				return result.String(), err
 			}
-			result += next
+			_, _ = result.WriteString(next)
 			continue
 		case SymExpressionStart:
 			exprValue, err := sr.parseExpression()
 			if err != nil {
-				return result, err
+				return result.String(), err
 			}
-			result += exprValue
+			_, _ = result.WriteString(exprValue)
 			continue
 		default:
-			result += string(ch)
+			_, _ = result.WriteRune(ch)
 			continue
 		}
 	}
 
-	return result, nil
+	return result.String(), nil
 }
 
 func (sr *ScriptReader) EvalExpressions(exprEnv any) (string, error) {
-	parts := make([]PostArgPart, 0)
-	currentPart := PostArgPart{}
-
 	exprStartToken, _ := utf8.DecodeRuneInString(TokExpStart)
+
+	// An argument with no expression in it evaluates to itself. Every
+	// argument of every command goes through here on the launch path and
+	// almost none of them carry an expression.
+	if rest := sr.remaining(); !strings.ContainsRune(rest, exprStartToken) {
+		sr.consumeAll()
+		return rest, nil
+	}
+
+	parts := make([]PostArgPart, 0)
+	var pending strings.Builder
+
+	flushPending := func() {
+		if pending.Len() > 0 {
+			parts = append(parts, PostArgPart{
+				Value: pending.String(),
+				Type:  ArgPartTypeString,
+			})
+			pending.Reset()
+		}
+	}
 
 	for {
 		ch, err := sr.read()
@@ -215,31 +243,23 @@ func (sr *ScriptReader) EvalExpressions(exprEnv any) (string, error) {
 		}
 
 		if ch == exprStartToken {
-			if currentPart.Type != ArgPartTypeUnknown {
-				parts = append(parts, currentPart)
-				currentPart = PostArgPart{}
-			}
+			flushPending()
 
-			currentPart.Type = ArgPartTypeExpression
 			exprValue, err := sr.parsePostExpression()
 			if err != nil {
 				return "", err
 			}
-			currentPart.Value = exprValue
-
-			parts = append(parts, currentPart)
-			currentPart = PostArgPart{}
+			parts = append(parts, PostArgPart{
+				Value: exprValue,
+				Type:  ArgPartTypeExpression,
+			})
 
 			continue
 		}
-		currentPart.Type = ArgPartTypeString
-		currentPart.Value += string(ch)
-		continue
+		_, _ = pending.WriteRune(ch)
 	}
 
-	if currentPart.Type != ArgPartTypeUnknown {
-		parts = append(parts, currentPart)
-	}
+	flushPending()
 
 	var result strings.Builder
 	for _, part := range parts {
