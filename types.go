@@ -195,6 +195,9 @@ type MisterScriptArgs struct {
 	GlobalArgs
 	// Hidden controls whether the script window is hidden.
 	Hidden string `advarg:"hidden"`
+	// LaunchOriginID sets LAUNCH_ORIGIN_ID in the script's environment. It is
+	// left unset when empty.
+	LaunchOriginID string `advarg:"launch_origin_id"`
 }
 
 // PlaytimeExtendArgs contains advanced arguments for the playtime.extend

@@ -46,6 +46,12 @@ func TestSlotAdvargFields(t *testing.T) {
 	requireAdvargField(t, reflect.TypeOf(PlaylistArgs{}), "slot")
 }
 
+func TestMisterScriptLaunchOriginAdvargField(t *testing.T) {
+	t.Parallel()
+
+	requireAdvargField(t, reflect.TypeOf(MisterScriptArgs{}), "launch_origin_id")
+}
+
 func requireAdvargField(t *testing.T, typ reflect.Type, tag string) {
 	t.Helper()
 
