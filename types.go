@@ -52,6 +52,9 @@ const (
 	KeyPreNotice      Key = "pre_notice"
 	KeyHidden         Key = "hidden"
 	KeyProfile        Key = "profile"
+	KeyAdvance        Key = "advance"
+	KeyIdle           Key = "idle"
+	KeyCountdown      Key = "countdown"
 )
 
 // Playtime extension amounts for the playtime.extend command.
@@ -126,6 +129,16 @@ type LaunchRandomArgs struct {
 	Action string `advarg:"action" validate:"omitempty,oneof=run details"`
 	// Slot selects the media slot for launch routing.
 	Slot string `advarg:"slot"`
+	// Advance makes the command a rotating playlist of one random launch that
+	// switches after this much playing time. It is a Go duration with a unit.
+	Advance string `advarg:"advance" validate:"omitempty,duration"` //nolint:revive // custom validator
+	// Idle makes the command a rotating playlist of one random launch that
+	// switches after this long with no user input. It is a Go duration with a
+	// unit and cannot be combined with Advance.
+	Idle string `advarg:"idle" validate:"omitempty,duration"` //nolint:revive // custom validator
+	// Countdown is how long the notice before an automatic switch stays up. It
+	// is a Go duration; 0 switches without a notice.
+	Countdown string `advarg:"countdown" validate:"omitempty,duration"` //nolint:revive // custom validator
 	// Tags filters results by tag criteria.
 	Tags []TagFilter `advarg:"tags"`
 }
@@ -188,6 +201,15 @@ type PlaylistArgs struct {
 	Repeat string `advarg:"repeat" validate:"omitempty,oneof=off all one"`
 	// Slot selects the media slot for playlist routing.
 	Slot string `advarg:"slot"`
+	// Advance switches to the next item after this much playing time. It is a
+	// Go duration with a unit, such as "5m".
+	Advance string `advarg:"advance" validate:"omitempty,duration"` //nolint:revive // custom validator
+	// Idle switches to the next item after this long with no user input. It is
+	// a Go duration with a unit and cannot be combined with Advance.
+	Idle string `advarg:"idle" validate:"omitempty,duration"` //nolint:revive // custom validator
+	// Countdown is how long the notice before an automatic switch stays up. It
+	// is a Go duration; 0 switches without a notice.
+	Countdown string `advarg:"countdown" validate:"omitempty,duration"` //nolint:revive // custom validator
 }
 
 // MisterScriptArgs contains advanced arguments for MiSTer script commands.

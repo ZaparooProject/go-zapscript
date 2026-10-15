@@ -46,6 +46,16 @@ func TestSlotAdvargFields(t *testing.T) {
 	requireAdvargField(t, reflect.TypeOf(PlaylistArgs{}), "slot")
 }
 
+func TestAutoAdvanceAdvargFields(t *testing.T) {
+	t.Parallel()
+
+	for _, typ := range []reflect.Type{reflect.TypeOf(PlaylistArgs{}), reflect.TypeOf(LaunchRandomArgs{})} {
+		requireAdvargField(t, typ, string(KeyAdvance))
+		requireAdvargField(t, typ, string(KeyIdle))
+		requireAdvargField(t, typ, string(KeyCountdown))
+	}
+}
+
 func TestMisterScriptLaunchOriginAdvargField(t *testing.T) {
 	t.Parallel()
 
