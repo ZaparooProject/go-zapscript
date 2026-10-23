@@ -55,6 +55,7 @@ const (
 	KeyAdvance        Key = "advance"
 	KeyIdle           Key = "idle"
 	KeyCountdown      Key = "countdown"
+	KeyStart          Key = "start"
 )
 
 // Playtime extension amounts for the playtime.extend command.
@@ -210,6 +211,9 @@ type PlaylistArgs struct {
 	// Countdown is how long the notice before an automatic switch stays up. It
 	// is a Go duration; 0 switches without a notice.
 	Countdown string `advarg:"countdown" validate:"omitempty,duration"` //nolint:revive // custom validator
+	// Start opens the playlist at this item, counted from 1, instead of
+	// where it was left last time. "1" always starts from the top.
+	Start string `advarg:"start" validate:"omitempty,number"`
 }
 
 // MisterScriptArgs contains advanced arguments for MiSTer script commands.
