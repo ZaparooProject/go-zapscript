@@ -857,6 +857,16 @@ func TestParseSeparatorAndFallbackEdgeCases(t *testing.T) {
 			want:  zapscript.Script{Cmds: []zapscript.Command{launch("**[a")}},
 		},
 		{
+			name:    "invalid media title reports auto launch errors",
+			input:   `@SNES [[unclosed`,
+			wantErr: zapscript.ErrUnmatchedExpression,
+		},
+		{
+			name:    "invalid command name reports auto launch errors",
+			input:   `**bad [[unclosed`,
+			wantErr: zapscript.ErrUnmatchedExpression,
+		},
+		{
 			name:  "invalid command name keeps following commands",
 			input: `**bad name||**stop`,
 			want:  zapscript.Script{Cmds: []zapscript.Command{launch("**bad name"), stop}},
