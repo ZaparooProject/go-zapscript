@@ -133,9 +133,8 @@ func (sr *ScriptReader) parseMediaTitleSyntax() (*mediaTitleParseResult, error) 
 	return result, nil
 }
 
-func (sr *ScriptReader) parseCommand(onlyOneArg bool) (Command, string, error) {
+func (sr *ScriptReader) parseCommand(onlyOneArg bool) (Command, error) {
 	cmd := Command{}
-	var buf []rune
 	// A command name is short in practice, but nothing bounds it: the
 	// grammar accepts name characters until it meets a separator, so an
 	// unterminated name is as long as the input.
@@ -145,16 +144,14 @@ commandLoop:
 	for {
 		ch, err := sr.read()
 		if err != nil {
-			return cmd, string(buf), err
+			return cmd, err
 		} else if ch == eof {
 			break commandLoop
 		}
 
-		buf = append(buf, ch)
-
 		eoc, err := sr.checkEndOfCmd(ch)
 		if err != nil {
-			return cmd, string(buf), err
+			return cmd, err
 		} else if eoc {
 			break commandLoop
 		}
@@ -175,7 +172,7 @@ commandLoop:
 				// roll it back to trigger adv arg parsing in parseArgs
 				err := sr.unread()
 				if err != nil {
-					return cmd, string(buf), err
+					return cmd, err
 				}
 				onlyAdvArgs = true
 			}
@@ -188,17 +185,17 @@ commandLoop:
 			case isInputMacroCmd(cmd.Name):
 				args, advArgs, err = sr.parseInputMacroArg()
 				if err != nil {
-					return cmd, string(buf), err
+					return cmd, err
 				}
 			case isInputRawCmd(cmd.Name):
 				args, err = sr.parseInputRawArg()
 				if err != nil {
-					return cmd, string(buf), err
+					return cmd, err
 				}
 			default:
 				args, advArgs, err = sr.parseArgs("", onlyAdvArgs, onlyOneArg)
 				if err != nil {
-					return cmd, string(buf), err
+					return cmd, err
 				}
 			}
 
@@ -213,18 +210,18 @@ commandLoop:
 			break commandLoop
 		default:
 			// might be a launch cmd
-			return cmd, string(buf), ErrInvalidCmdName
+			return cmd, ErrInvalidCmdName
 		}
 	}
 
 	if cmd.Name == "" {
 		if name.Len() == 0 {
-			return cmd, string(buf), ErrEmptyCmdName
+			return cmd, ErrEmptyCmdName
 		}
 		cmd.Name = normalizeCmdName(name.String())
 	}
 
-	return cmd, string(buf), nil
+	return cmd, nil
 }
 
 func (sr *ScriptReader) ParseScript() (Script, error) {
@@ -241,6 +238,11 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 		if err != nil {
 			return parseErr(err)
 		}
+		// A segment holding nothing but whitespace is skipped, the same as
+		// an empty one between back-to-back separators.
+		if len(args) == 0 && len(advArgs) == 0 {
+			return nil
+		}
 		cmd := Command{
 			Name: ZapScriptCmdLaunch,
 		}
@@ -256,6 +258,10 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 	}
 
 	for {
+		// The start of the segment, so a segment that opens like a media
+		// title or a command but isn't one can be read again as an
+		// auto-launch from its first character.
+		segStart := sr.mark()
 		ch, err := sr.read()
 		if err != nil {
 			return script, err
@@ -276,9 +282,14 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 				return script, parseErr(err)
 			}
 
-			// If not valid media title format (no / found), treat as auto-launch
+			// Not a valid media title, so the segment is an auto-launch. The
+			// title parser has already read past the end of the command, so
+			// reading the segment again from the @ keeps the following
+			// commands separate and gives it the auto-launch escape and
+			// advanced argument handling.
 			if !result.valid {
-				if autoErr := parseAutoLaunchCmd(string(SymMediaTitleStart) + result.rawContent); autoErr != nil {
+				sr.reset(segStart)
+				if autoErr := parseAutoLaunchCmd(""); autoErr != nil {
 					return script, parseErr(autoErr)
 				}
 				continue
@@ -347,11 +358,14 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 				continue
 			}
 
-			cmd, buf, err := sr.parseCommand(false)
+			cmd, err := sr.parseCommand(false)
 			switch {
 			case errors.Is(err, ErrInvalidCmdName):
-				// assume it's actually an auto launch cmd
-				if autoErr := parseAutoLaunchCmd("**" + buf); autoErr != nil {
+				// Assume it's actually an auto launch cmd. The command
+				// parser's buffer holds raw text that may end partway
+				// through an escape, so read the segment again from the **.
+				sr.reset(segStart)
+				if autoErr := parseAutoLaunchCmd(""); autoErr != nil {
 					return script, parseErr(autoErr)
 				}
 				continue

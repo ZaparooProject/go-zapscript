@@ -102,11 +102,14 @@ func (sr *ScriptReader) parseExpression() (string, error) {
 	_, _ = rawExpr.WriteString(TokExpStart)
 
 	next, err := sr.read()
-	if err != nil {
+	switch {
+	case err != nil:
 		return rawExpr.String(), err
-	} else if next != SymExpressionStart {
-		err := sr.unread()
-		if err != nil {
+	case next == eof:
+		// Nothing was read, so there is nothing to unread.
+		return string(SymExpressionStart), nil
+	case next != SymExpressionStart:
+		if err := sr.unread(); err != nil {
 			return rawExpr.String(), err
 		}
 		return string(SymExpressionStart), nil
