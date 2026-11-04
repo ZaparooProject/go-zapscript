@@ -761,3 +761,134 @@ func TestAdvArgs_UnmarshalJSON(t *testing.T) {
 		}
 	})
 }
+
+func TestParseSeparatorAndFallbackEdgeCases(t *testing.T) {
+	t.Parallel()
+	launch := func(arg string) zapscript.Command {
+		return zapscript.Command{Name: zapscript.ZapScriptCmdLaunch, Args: []string{arg}}
+	}
+	stop := zapscript.Command{Name: "stop"}
+
+	tests := []struct {
+		wantErr error
+		name    string
+		input   string
+		want    zapscript.Script
+	}{
+		{
+			name:  "trailing open bracket",
+			input: `**echo:a[`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{{Name: "echo", Args: []string{"a["}}}},
+		},
+		{
+			name:  "trailing open bracket in auto launch",
+			input: `/roms/a[`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("/roms/a[")}},
+		},
+		{
+			name:  "invalid media title keeps following commands",
+			input: `@SNES||**stop`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("@SNES"), stop}},
+		},
+		{
+			name:  "invalid media title with empty game keeps following commands",
+			input: `@SNES/||**stop`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("@SNES/"), stop}},
+		},
+		{
+			name:  "invalid media title keeps advanced args",
+			input: `@SNES?launcher=x`,
+			want: zapscript.Script{Cmds: []zapscript.Command{{
+				Name:    zapscript.ZapScriptCmdLaunch,
+				Args:    []string{"@SNES"},
+				AdvArgs: zapscript.NewAdvArgs(map[string]string{"launcher": "x"}),
+			}}},
+		},
+		{
+			name:  "lone trailing pipe is text",
+			input: `/roms/game.sfc|`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("/roms/game.sfc|")}},
+		},
+		{
+			name:  "lone trailing pipe in media title is text",
+			input: `@SNES/Mario|`,
+			want: zapscript.Script{Cmds: []zapscript.Command{
+				{Name: zapscript.ZapScriptCmdLaunchTitle, Args: []string{"SNES/Mario|"}},
+			}},
+		},
+		{
+			name:  "lone trailing pipe after command name",
+			input: `**stop|`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("**stop|")}},
+		},
+		{
+			name:  "whitespace only segment is skipped",
+			input: `/roms/game.sfc||  ||**stop`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("/roms/game.sfc"), stop}},
+		},
+		{
+			name:  "empty segment is skipped",
+			input: `/roms/game.sfc||||**stop`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("/roms/game.sfc"), stop}},
+		},
+		{
+			name:    "only separators",
+			input:   `||||`,
+			wantErr: zapscript.ErrEmptyZapScript,
+		},
+		{
+			name:    "only whitespace segments",
+			input:   `  ||  ||  `,
+			wantErr: zapscript.ErrEmptyZapScript,
+		},
+		{
+			name:  "explicit empty quoted arg is kept",
+			input: `''||**stop`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch(""), stop}},
+		},
+		{
+			name:  "escape after invalid command name is decoded",
+			input: `**control^Zb`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("**controlZb")}},
+		},
+		{
+			name:  "escape right after command start is decoded",
+			input: `**^[a`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("**[a")}},
+		},
+		{
+			name:    "invalid media title reports auto launch errors",
+			input:   `@SNES [[unclosed`,
+			wantErr: zapscript.ErrUnmatchedExpression,
+		},
+		{
+			name:    "invalid command name reports auto launch errors",
+			input:   `**bad [[unclosed`,
+			wantErr: zapscript.ErrUnmatchedExpression,
+		},
+		{
+			name:  "invalid command name keeps following commands",
+			input: `**bad name||**stop`,
+			want:  zapscript.Script{Cmds: []zapscript.Command{launch("**bad name"), stop}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := zapscript.NewParser(tt.input).ParseScript()
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("ParseScript(%q) error = %v, want %v", tt.input, err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseScript(%q) unexpected error: %v", tt.input, err)
+			}
+			if diff := cmp.Diff(tt.want, got, cmp.AllowUnexported(zapscript.AdvArgs{})); diff != "" {
+				t.Errorf("ParseScript(%q) mismatch (-want +got):\n%s", tt.input, diff)
+			}
+		})
+	}
+}

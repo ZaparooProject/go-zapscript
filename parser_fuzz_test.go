@@ -74,6 +74,12 @@ func FuzzParseScript(f *testing.F) {
 		`**cmd?=`,
 		`**cmd?key=`,
 		`**cmd?=value`,
+		`**echo:a[`,
+		`@SNES||**stop`,
+		`/roms/game.sfc|`,
+		`/roms/game.sfc||  ||**stop`,
+		`**control^Zb`,
+		`**^[a`,
 		// Malformed
 		`[[`,
 		`]]`,

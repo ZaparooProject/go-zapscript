@@ -322,6 +322,25 @@ func (sr *ScriptReader) consumeAll() {
 	sr.lastWidth = 0
 }
 
+// readerMark is a saved reader position for reset.
+type readerMark struct {
+	off int
+	pos int64
+}
+
+// mark saves the current position so a segment that turns out not to be what
+// it first looked like can be read again from the start.
+func (sr *ScriptReader) mark() readerMark {
+	return readerMark{off: sr.off, pos: sr.pos}
+}
+
+// reset returns the reader to a position saved by mark.
+func (sr *ScriptReader) reset(m readerMark) {
+	sr.off = m.off
+	sr.pos = m.pos
+	sr.lastWidth = 0
+}
+
 func (sr *ScriptReader) peek() (rune, error) {
 	// A peek invalidates the pending unread, matching the buffered reader
 	// this replaced, so a caller cannot start relying on the two composing.
@@ -357,9 +376,9 @@ func (sr *ScriptReader) checkEndOfCmd(ch rune) (bool, error) {
 		return false, err
 	}
 
+	// A lone separator at the end of the input is text, the same as a lone
+	// separator anywhere else. Only a doubled separator ends a command.
 	switch next {
-	case eof:
-		return true, nil
 	case SymCmdSep:
 		err := sr.skip()
 		if err != nil {
