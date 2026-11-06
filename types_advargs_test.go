@@ -60,6 +60,7 @@ func TestPlaylistStartAdvargField(t *testing.T) {
 	t.Parallel()
 
 	requireAdvargField(t, reflect.TypeOf(PlaylistArgs{}), string(KeyStart))
+	requireAdvargField(t, reflect.TypeOf(PlaylistArgs{}), string(KeySystem))
 }
 
 func TestMisterScriptLaunchOriginAdvargField(t *testing.T) {
