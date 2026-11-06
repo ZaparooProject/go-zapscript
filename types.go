@@ -214,6 +214,9 @@ type PlaylistArgs struct {
 	// Start opens the playlist at this item, counted from 1, instead of
 	// where it was left last time. "1" always starts from the top.
 	Start string `advarg:"start" validate:"omitempty,number"`
+	// System keeps a folder playlist to one system's media: the folder's
+	// media of that system, as a browse filtered by it lists them.
+	System string `advarg:"system" validate:"omitempty,system"` //nolint:revive // custom validator
 }
 
 // MisterScriptArgs contains advanced arguments for MiSTer script commands.
