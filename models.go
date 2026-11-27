@@ -70,6 +70,9 @@ const (
 
 	ZapScriptCmdPlaytimeExtend = "playtime.extend"
 
+	ZapScriptCmdAdd    = "add"
+	ZapScriptCmdRemove = "remove"
+
 	ZapScriptCmdInputKey = "input.key" // DEPRECATED
 	ZapScriptCmdKey      = "key"       // DEPRECATED
 	ZapScriptCmdCoinP1   = "coinp1"    // DEPRECATED
