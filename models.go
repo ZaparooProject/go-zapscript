@@ -73,6 +73,8 @@ const (
 	ZapScriptCmdAdd    = "add"
 	ZapScriptCmdRemove = "remove"
 
+	ZapScriptCmdInclude = "include"
+
 	ZapScriptCmdInputKey = "input.key" // DEPRECATED
 	ZapScriptCmdKey      = "key"       // DEPRECATED
 	ZapScriptCmdCoinP1   = "coinp1"    // DEPRECATED
