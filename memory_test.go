@@ -334,6 +334,11 @@ func TestReplaceMemory(t *testing.T) {
 			want: `**stop||$a=2`,
 		},
 		{
+			name: "removes memory-only text led by whitespace",
+			text: " \n$a=1",
+			want: "",
+		},
+		{
 			name: "keeps whitespace before the item",
 			text: "**stop|| \n$a=1",
 			mem:  zapscript.Memory{{Key: "a", Value: 2}},

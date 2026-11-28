@@ -185,6 +185,9 @@ func FuzzReplaceMemory(f *testing.F) {
 		if diff := cmp.Diff(script.Cmds, again.Cmds, cmp.AllowUnexported(AdvArgs{})); diff != "" {
 			t.Fatalf("commands changed (-want +got):\n%s", diff)
 		}
+		if diff := cmp.Diff(script.Traits, again.Traits); diff != "" {
+			t.Fatalf("traits changed (-want +got):\n%s", diff)
+		}
 		if diff := cmp.Diff(changed, again.Memory); diff != "" {
 			t.Fatalf("memory changed (-want +got):\n%s", diff)
 		}

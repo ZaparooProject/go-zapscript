@@ -326,6 +326,11 @@ func ReplaceMemory(text string, m Memory) (string, error) {
 	var out string
 	if len(m) == 0 {
 		out = trimTrailingSeparator(head)
+		// A text that held only memory leaves only the whitespace before
+		// it, which is no script at all.
+		if strings.TrimSpace(out) == "" {
+			out = ""
+		}
 	} else {
 		// Whitespace before a separator can be part of the item it follows,
 		// so the text is kept as it is and only a separator is added.
