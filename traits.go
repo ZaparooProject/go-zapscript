@@ -101,7 +101,7 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 			_, _ = fallbackBuf.WriteRune(ch)
 
 			// Parse the value
-			parsedValue, valueStr, parseErr := sr.parseTraitValue()
+			parsedValue, valueStr, parseErr := sr.parseTraitValue(SymTraitsStart)
 			if parseErr != nil {
 				return nil, parseErr
 			}
@@ -180,9 +180,10 @@ func (sr *ScriptReader) parseTraitsSyntax() (*traitsParseResult, error) {
 	return result, nil
 }
 
-// parseTraitValue parses a trait value with type inference.
-// Returns (parsed value, raw string for fallback, error).
-func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err error) {
+// parseTraitValue parses a trait value with type inference. An unquoted value
+// ends at whitespace, a separator or stop, the symbol that starts the next
+// pair. Returns (parsed value, raw string for fallback, error).
+func (sr *ScriptReader) parseTraitValue(stop rune) (parsedValue any, rawStr string, err error) {
 	var rawBuf strings.Builder   // tracks raw input for fallback
 	var valueBuf strings.Builder // tracks processed value
 	quoted := false
@@ -250,14 +251,14 @@ func (sr *ScriptReader) parseTraitValue() (parsedValue any, rawStr string, err e
 		return sr.parseTraitArray()
 	}
 
-	// Unquoted value - read until whitespace, #, or end of command
+	// Unquoted value - read until whitespace, the stop symbol, or end of command
 	for {
 		next, peekErr := sr.peek()
 		if peekErr != nil {
 			return "", rawBuf.String(), peekErr
 		}
 
-		if next == eof || next == SymCmdSep || isWhitespace(next) || next == SymTraitsStart {
+		if next == eof || next == SymCmdSep || isWhitespace(next) || next == stop {
 			break
 		}
 

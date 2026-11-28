@@ -224,6 +224,13 @@ commandLoop:
 	return cmd, nil
 }
 
+// nextIsMemoryKey reports whether the rune after a $ just read starts a
+// memory key. A $ followed by anything else is ordinary auto-launch text.
+func (sr *ScriptReader) nextIsMemoryKey() bool {
+	next, err := sr.peek()
+	return err == nil && isAdvArgNameStart(next)
+}
+
 func (sr *ScriptReader) ParseScript() (Script, error) {
 	script := Script{}
 	hasNonTraitContent := false
@@ -269,8 +276,21 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 			break
 		}
 
+		if script.Memory != nil && !isWhitespace(ch) {
+			return script, parseErr(ErrMemoryNotLast)
+		}
+
 		switch {
 		case isWhitespace(ch):
+			continue
+		case ch == SymMemoryStart && sr.nextIsMemoryKey():
+			// Memory syntax: $key=value $key2=value2, always the last item.
+			mem, memErr := sr.parseMemorySyntax()
+			if memErr != nil {
+				return script, parseErr(memErr)
+			}
+			script.Memory = mem
+			sr.memoryStart = segStart.off
 			continue
 		case sr.pos == 1 && ch == SymJSONStart:
 			// reserve starting { as json script for later
@@ -393,14 +413,12 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 
 			continue
 		default:
-			err := sr.unread()
-			if err != nil {
-				return script, parseErr(err)
-			}
+			// Back to the segment start rather than unread, since a $ that
+			// does not open memory has already been peeked past.
+			sr.reset(segStart)
 
-			err = parseAutoLaunchCmd("")
-			if err != nil {
-				return script, parseErr(err)
+			if autoErr := parseAutoLaunchCmd(""); autoErr != nil {
+				return script, parseErr(autoErr)
 			}
 
 			continue
@@ -415,7 +433,7 @@ func (sr *ScriptReader) ParseScript() (Script, error) {
 		// Silent fallback when mixed with other content (documented behavior)
 	}
 
-	if len(script.Cmds) == 0 && len(script.Traits) == 0 {
+	if len(script.Cmds) == 0 && len(script.Traits) == 0 && len(script.Memory) == 0 {
 		return script, ErrEmptyZapScript
 	}
 
