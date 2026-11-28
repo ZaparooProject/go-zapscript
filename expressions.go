@@ -71,17 +71,22 @@ type ExprEnvHook struct {
 
 //nolint:tagliatelle // JSON uses snake_case to match expression env naming
 type ArgExprEnv struct {
-	ActiveMedia  ExprEnvActiveMedia `expr:"active_media" json:"active_media"`
-	Device       ExprEnvDevice      `expr:"device" json:"device"`
-	LastScanned  ExprEnvLastScanned `expr:"last_scanned" json:"last_scanned"`
-	Scanned      ExprEnvScanned     `expr:"scanned" json:"scanned,omitempty"`
-	Launching    ExprEnvLaunching   `expr:"launching" json:"launching,omitempty"`
-	Platform     string             `expr:"platform" json:"platform"`
-	Version      string             `expr:"version" json:"version"`
-	ScanMode     string             `expr:"scan_mode" json:"scan_mode"`
-	Hook         ExprEnvHook        `expr:"hook" json:"hook,omitempty"`
-	MediaPlaying bool               `expr:"media_playing" json:"media_playing"`
-	MediaReady   bool               `expr:"media_ready" json:"media_ready"`
+	// Memory holds the scanned card's memory values by key. A key the card
+	// does not hold reads as nil.
+	Memory      map[string]any     `expr:"memory" json:"memory,omitempty"`
+	ActiveMedia ExprEnvActiveMedia `expr:"active_media" json:"active_media"`
+	Device      ExprEnvDevice      `expr:"device" json:"device"`
+	LastScanned ExprEnvLastScanned `expr:"last_scanned" json:"last_scanned"`
+	Scanned     ExprEnvScanned     `expr:"scanned" json:"scanned,omitempty"`
+	Launching   ExprEnvLaunching   `expr:"launching" json:"launching,omitempty"`
+	Platform    string             `expr:"platform" json:"platform"`
+	Version     string             `expr:"version" json:"version"`
+	ScanMode    string             `expr:"scan_mode" json:"scan_mode"`
+	Hook        ExprEnvHook        `expr:"hook" json:"hook,omitempty"`
+	// Now is the current Unix time in seconds, from the device clock.
+	Now          int64 `expr:"now" json:"now"`
+	MediaPlaying bool  `expr:"media_playing" json:"media_playing"`
+	MediaReady   bool  `expr:"media_ready" json:"media_ready"`
 }
 
 //nolint:tagliatelle // JSON uses snake_case to match expression env naming
@@ -279,6 +284,8 @@ func (sr *ScriptReader) EvalExpressions(exprEnv any) (string, error) {
 				_, _ = result.WriteString(strconv.FormatBool(v))
 			case int:
 				_, _ = result.WriteString(strconv.Itoa(v))
+			case int64:
+				_, _ = result.WriteString(strconv.FormatInt(v, 10))
 			case float64:
 				_, _ = result.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
 			default:

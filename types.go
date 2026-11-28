@@ -56,6 +56,7 @@ const (
 	KeyIdle           Key = "idle"
 	KeyCountdown      Key = "countdown"
 	KeyStart          Key = "start"
+	KeyCredits        Key = "credits"
 )
 
 // Playtime extension amounts for the playtime.extend command.
@@ -94,6 +95,9 @@ const (
 type GlobalArgs struct {
 	// When controls conditional execution. If non-empty and falsy, command is skipped.
 	When string `advarg:"when"`
+	// Credits takes one credit from the card's memory before the command
+	// runs, and fails the run when none are left.
+	Credits string `advarg:"credits"`
 }
 
 // LaunchArgs contains advanced arguments for the launch command.

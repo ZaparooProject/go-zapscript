@@ -35,18 +35,18 @@ func TestParseCollectionEdit(t *testing.T) {
 	}{
 		{
 			name:  "add to a built-in collection",
-			input: `**add:favorites://`,
-			want:  zapscript.Command{Name: zapscript.ZapScriptCmdAdd, Args: []string{"favorites://"}},
+			input: `**collection.add:favorites://`,
+			want:  zapscript.Command{Name: zapscript.ZapScriptCmdCollectionAdd, Args: []string{"favorites://"}},
 		},
 		{
 			name:  "remove from a built-in collection",
-			input: `**remove:playlater://`,
-			want:  zapscript.Command{Name: zapscript.ZapScriptCmdRemove, Args: []string{"playlater://"}},
+			input: `**collection.remove:playlater://`,
+			want:  zapscript.Command{Name: zapscript.ZapScriptCmdCollectionRemove, Args: []string{"playlater://"}},
 		},
 		{
 			name:  "add to a deck by name",
-			input: `**add:deck://Arcade Night`,
-			want:  zapscript.Command{Name: zapscript.ZapScriptCmdAdd, Args: []string{"deck://Arcade Night"}},
+			input: `**collection.add:deck://Arcade Night`,
+			want:  zapscript.Command{Name: zapscript.ZapScriptCmdCollectionAdd, Args: []string{"deck://Arcade Night"}},
 		},
 	}
 

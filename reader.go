@@ -233,6 +233,7 @@ func (c Command) String() string {
 
 type Script struct {
 	Traits map[string]any `json:"traits,omitempty"`
+	Memory Memory         `json:"memory,omitempty"`
 	Cmds   []Command      `json:"cmds"`
 }
 
@@ -277,6 +278,9 @@ type ScriptReader struct {
 	// saved position to tell whether a quote or brace opened an argument, so
 	// it counts runes rather than bytes.
 	pos int64
+	// memoryStart is the byte offset of the $ that opens the script's memory
+	// item, set by ParseScript when it finds one.
+	memoryStart int
 }
 
 func NewParser(value string) *ScriptReader {

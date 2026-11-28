@@ -33,6 +33,9 @@ var (
 	ErrBadExpressionReturn    = errors.New("expression return type not supported")
 	ErrInvalidTraitKey        = errors.New("invalid trait key")
 	ErrUnmatchedArrayBracket  = errors.New("unmatched array bracket")
+	ErrInvalidMemory          = errors.New("invalid memory")
+	ErrMemoryNotLast          = errors.New("memory must be the last item in a script")
+	ErrInvalidMemoryValue     = errors.New("memory value not supported")
 
 	// Input macro expansion errors.
 	ErrInputMacroRepeatTooLarge = errors.New("input macro repeat count exceeds maximum")
@@ -74,6 +77,7 @@ const (
 	SymTagNot              = '-'
 	SymTagOr               = '~'
 	SymTraitsStart         = '#'
+	SymMemoryStart         = '$'
 	SymArrayStart          = '['
 	SymArrayEnd            = ']'
 	SymArraySep            = ','

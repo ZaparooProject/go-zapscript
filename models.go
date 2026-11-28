@@ -70,8 +70,13 @@ const (
 
 	ZapScriptCmdPlaytimeExtend = "playtime.extend"
 
-	ZapScriptCmdAdd    = "add"
-	ZapScriptCmdRemove = "remove"
+	ZapScriptCmdCollectionAdd    = "collection.add"
+	ZapScriptCmdCollectionRemove = "collection.remove"
+
+	ZapScriptCmdMemorySet   = "memory.set"
+	ZapScriptCmdMemoryAdd   = "memory.add"
+	ZapScriptCmdMemoryClear = "memory.clear"
+	ZapScriptCmdWhen        = "when"
 
 	ZapScriptCmdInclude = "include"
 

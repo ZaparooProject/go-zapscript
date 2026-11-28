@@ -16,7 +16,9 @@
 package zapscript
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -90,6 +92,15 @@ func FuzzParseScript(f *testing.F) {
 		`**cmd:émoji🎮`,
 		`**cmd:日本語`, //nolint:gosmopolitan // Japanese test case
 		`**cmd:	tabs	and  spaces`,
+		// Memory
+		`**input.coinp1||$credits=10 $owner="Callan B"`,
+		`$credits=3`,
+		`**launch:a||$x=[1,"b",2.5]$y=true||`,
+		`**launch:a||$x=1||**stop`,
+		`**launch:a||$x="a"b`,
+		`$HOME/x`,
+		`$1abc`,
+		`**launch:a||$`,
 		// Long input
 		`**cmd:` + string(make([]byte, 1000)),
 	}
@@ -102,6 +113,81 @@ func FuzzParseScript(f *testing.F) {
 		p := NewParser(input)
 		// Should not panic - either returns result or error
 		_, _ = p.ParseScript()
+	})
+}
+
+// FuzzReplaceMemory checks that a script's memory can always be written back:
+// replacing it with itself or with a changed copy gives a script that parses
+// to the same commands and traits and reads back the memory written. Adding
+// memory to a script that has none may be refused, but never done wrongly.
+func FuzzReplaceMemory(f *testing.F) {
+	seeds := []string{
+		`**input.coinp1||$credits=10 $owner="Callan B"`,
+		`$credits=3`,
+		`**launch:a||$x=[1,"b",2.5]$y=true||`,
+		`**launch:a||#tag=x||$n=-0.5 $s='q^'q'`,
+		`**launch:a`,
+		`**launch:a||`,
+		`#a=1`,
+		`**echo:x^||$k=1`,
+		`@snes/Game||$k="v"`,
+	}
+	for _, seed := range seeds {
+		f.Add(seed, "credits", int64(7), "text")
+	}
+
+	f.Fuzz(func(t *testing.T, input, key string, n int64, str string) {
+		script, err := NewParser(input).ParseScript()
+		if err != nil {
+			return
+		}
+		if strings.ContainsRune(input, 0) {
+			if _, nulErr := ReplaceMemory(input, script.Memory); nulErr == nil {
+				t.Fatalf("ReplaceMemory(%q) accepted a NUL", input)
+			}
+			return
+		}
+
+		same, err := ReplaceMemory(input, script.Memory)
+		if err != nil {
+			t.Fatalf("ReplaceMemory(%q) with its own memory: %v", input, err)
+		}
+		if script.Memory == nil && same != input {
+			t.Fatalf("ReplaceMemory(%q) with no memory changed the text to %q", input, same)
+		}
+
+		changed := script.Memory.Clone()
+		if ValidateTraitKey(key) != nil {
+			key = "credits"
+		}
+		if setErr := changed.Set(key, n); setErr != nil {
+			t.Fatalf("Set(%q): %v", key, setErr)
+		}
+		if setErr := changed.Set("note", str); setErr != nil {
+			if utf8.ValidString(str) && !strings.ContainsRune(str, 0) {
+				t.Fatalf("Set(note): %v", setErr)
+			}
+			return
+		}
+		out, err := ReplaceMemory(input, changed)
+		switch {
+		case err != nil && script.Memory != nil:
+			t.Fatalf("ReplaceMemory(%q) with changed memory: %v", input, err)
+		case err != nil:
+			// Some texts can't take an appended item without changing what
+			// they say, such as one ending in a lone |. Refusing is correct.
+			return
+		}
+		again, err := NewParser(out).ParseScript()
+		if err != nil {
+			t.Fatalf("reparse %q: %v", out, err)
+		}
+		if diff := cmp.Diff(script.Cmds, again.Cmds, cmp.AllowUnexported(AdvArgs{})); diff != "" {
+			t.Fatalf("commands changed (-want +got):\n%s", diff)
+		}
+		if diff := cmp.Diff(changed, again.Memory); diff != "" {
+			t.Fatalf("memory changed (-want +got):\n%s", diff)
+		}
 	})
 }
 
